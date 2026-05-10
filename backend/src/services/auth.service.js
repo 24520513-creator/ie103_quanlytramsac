@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { query } = require('../config/db');
+const { query } = require('../config/database');
 const { ConflictError, UnauthorizedError, ValidationError } = require('../utils/response');
 const authConfig = require('../config/auth');
 

@@ -1,27 +1,35 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { Zap } from 'lucide-react';
 import { api } from '../../services/api';
 
-interface LoginPageProps {
-  onLogin: (user: any, token: string) => void;
-  onSwitchToRegister: () => void;
-  onSwitchToForgotPassword: () => void;
-}
+const roleMap: Record<string, string> = {
+  Customer: 'client', Manager: 'manager', Admin: 'admin',
+  SysAdmin: 'admin', Operator: 'manager',
+};
 
-export default function LoginPage({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }: LoginPageProps) {
+export default function LoginPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!email.trim()) { setError('Email is required'); return; }
+    if (!password) { setError('Password is required'); return; }
+    if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
     setLoading(true);
     try {
-      const res = await api.post('/auth/login', { Email: email, Password: password });
-      localStorage.setItem('token', res.data.token);
-      onLogin(res.data.user, res.data.token);
+      const res: any = await api.post('/auth/login', { Email: email, Password: password });
+      const token = res.token;
+      const user = res.user;
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      const frontendRole = roleMap[user.Role] || 'client';
+      navigate(`/${frontendRole}/dashboard`);
     } catch (err: any) {
       setError(err.message || 'Login failed');
     } finally {
@@ -47,36 +55,23 @@ export default function LoginPage({ onLogin, onSwitchToRegister, onSwitchToForgo
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Email or Username</label>
-            <input
-              type="text"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              required
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <input type="text" value={email} onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email" required
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              required
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password" required
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div className="text-right">
-            <button type="button" onClick={onSwitchToForgotPassword} className="text-sm text-blue-600 hover:underline font-medium">
+            <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline font-medium">
               Forgot password?
-            </button>
+            </Link>
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50"
-          >
+          <button type="submit" disabled={loading}
+            className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50">
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
@@ -84,9 +79,7 @@ export default function LoginPage({ onLogin, onSwitchToRegister, onSwitchToForgo
         <div className="text-center mt-6">
           <p className="text-sm text-slate-500">
             Don't have an account?{' '}
-            <button type="button" onClick={onSwitchToRegister} className="text-blue-600 font-bold hover:underline">
-              Register
-            </button>
+            <Link to="/register" className="text-blue-600 font-bold hover:underline">Register</Link>
           </p>
         </div>
       </div>

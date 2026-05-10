@@ -6,11 +6,12 @@ PRINT N'============================================';
 
 :r .\01_CreateDatabase.sql
 :r .\02_CreateTables.sql
-:r .\03_SeedData.sql
+:r .\07_CreateErrorHandling.sql
 :r .\04_CreateFunctions.sql
 :r .\05_CreateStoredProcedures.sql
 :r .\06_CreateTriggers.sql
-:r .\07_CreateViews.sql
+:r .\03_SeedData.sql
+:r .\08_CreateBatchJobs.sql
 
 PRINT N'';
 PRINT N'============================================';

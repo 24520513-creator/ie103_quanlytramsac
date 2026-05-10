@@ -1,21 +1,36 @@
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-interface ApiResponse<T = any> {
+export interface ApiResponse<T = any> {
   success: boolean;
   message: string;
   data: T;
+  pagination?: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
   }
 }
 
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+function onTokenRefreshed(token: string) {
+  refreshSubscribers.forEach(cb => cb(token));
+  refreshSubscribers = [];
+}
+
 async function request<T = any>(
   method: string,
   path: string,
-  body?: any
+  body?: any,
+  isRetry = false
 ): Promise<ApiResponse<T>> {
   const token = localStorage.getItem('token');
   const headers: Record<string, string> = {
@@ -31,9 +46,32 @@ async function request<T = any>(
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  if (res.status === 401) {
+  if (res.status === 401 && !isRetry) {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (refreshToken && !isRefreshing) {
+      isRefreshing = true;
+      try {
+        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          const newToken = refreshData.token || refreshData.data?.token;
+          localStorage.setItem('token', newToken);
+          isRefreshing = false;
+          onTokenRefreshed(newToken);
+          headers['Authorization'] = `Bearer ${newToken}`;
+          return request<T>(method, path, body, true);
+        }
+      } catch {
+        // refresh failed
+      }
+      isRefreshing = false;
+    }
     localStorage.clear();
-    window.location.href = '/';
+    window.location.href = '/login';
     throw new ApiError(401, 'Unauthorized');
   }
 
@@ -51,4 +89,4 @@ export const api = {
   delete: <T = any>(path: string) => request<T>('DELETE', path),
 };
 
-export type { ApiResponse, ApiError };
+export { request };

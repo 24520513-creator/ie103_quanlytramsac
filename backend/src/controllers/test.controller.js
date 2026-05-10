@@ -1,4 +1,4 @@
-const { query } = require('../config/db');
+const { query } = require('../config/database');
 const { asyncHandler } = require('../middleware/error.middleware');
 const { success } = require('../utils/response');
 

@@ -55,4 +55,11 @@ async function getTransaction() {
   return transaction;
 }
 
-module.exports = { sql, getPool, query, execute, getTransaction };
+async function closePool() {
+  if (pool) {
+    await pool.close();
+    pool = null;
+  }
+}
+
+module.exports = { sql, getPool, query, execute, getTransaction, closePool };

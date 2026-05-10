@@ -88,8 +88,19 @@ class BaseRepository {
   }
 
   _getStatusColumn() {
-    const statusCols = ['SessionStatus', 'TransactionStatus', 'PointStatus', 'StationStatus', 'AccountStatus', 'ScheduleStatus'];
-    return statusCols[0];
+    const statusMap = {
+      ChargingSession: 'SessionStatus',
+      Transaction: 'TransactionStatus',
+      ChargingPoint: 'PointStatus',
+      ChargingStation: 'StationStatus',
+      User: 'AccountStatus',
+      Booking: 'Status',
+      MaintenanceSchedule: 'Status',
+      ErrorLog: 'Severity',
+      Notification: 'IsRead',
+    };
+    const tableName = this.tableName.replace(/\[.*?\]\./, '');
+    return statusMap[tableName] || 'Status';
   }
 }
 

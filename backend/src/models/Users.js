@@ -40,4 +40,22 @@ class Vehicle extends BaseModel {
   }
 }
 
-module.exports = { UserModel, Vehicle };
+class Notification extends BaseModel {
+  constructor(row) {
+    super();
+    if (row) {
+      this.NotificationID = row.NotificationID;
+      this.UserID = row.UserID;
+      this.Title = row.Title;
+      this.Message = row.Message;
+      this.NotificationType = row.NotificationType;
+      this.ReferenceType = row.ReferenceType;
+      this.ReferenceID = row.ReferenceID;
+      this.IsRead = row.IsRead ?? false;
+      this.ReadAt = row.ReadAt;
+      this.CreatedAt = row.CreatedAt;
+    }
+  }
+}
+
+module.exports = { UserModel, Vehicle, Notification };

@@ -104,7 +104,43 @@ class ChargingPoint extends BaseModel {
   }
 }
 
+class ElectricitySupplier extends BaseModel {
+  constructor(row) {
+    super();
+    if (row) {
+      this.SupplierID = row.SupplierID;
+      this.SupplierCode = row.SupplierCode;
+      this.SupplierName = row.SupplierName;
+      this.CountryID = row.CountryID;
+      this.ContactPerson = row.ContactPerson;
+      this.ContactPhone = row.ContactPhone;
+      this.ContactEmail = row.ContactEmail;
+      this.IsActive = row.IsActive ?? true;
+    }
+  }
+}
+
+class ErrorLog extends BaseModel {
+  constructor(row) {
+    super();
+    if (row) {
+      this.ErrorLogID = row.ErrorLogID;
+      this.PointID = row.PointID;
+      this.SessionID = row.SessionID;
+      this.ErrorCode = row.ErrorCode;
+      this.Severity = row.Severity;
+      this.Message = row.Message;
+      this.ErrorSource = row.ErrorSource;
+      this.IsResolved = row.IsResolved ?? false;
+      this.ResolvedAt = row.ResolvedAt;
+      this.ResolvedBy = row.ResolvedBy;
+      this.CreatedAt = row.CreatedAt;
+    }
+  }
+}
+
 module.exports = {
   Country, Region, Address, Franchise,
   ChargingStation, ChargingPoint,
+  ElectricitySupplier, ErrorLog,
 };

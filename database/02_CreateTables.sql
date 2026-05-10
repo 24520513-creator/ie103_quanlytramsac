@@ -86,6 +86,31 @@ CREATE TABLE Infrastructure.Franchise
 );
 GO
 
+-- ============================================================
+-- ElectricitySupplier (NEW)
+-- ============================================================
+CREATE TABLE Infrastructure.ElectricitySupplier
+(
+    SupplierID       INT IDENTITY(1,1) NOT NULL,
+    SupplierCode     NVARCHAR(20) NOT NULL,
+    SupplierName     NVARCHAR(200) NOT NULL,
+    RegionID         INT NOT NULL,
+    UnitPricePerKWh  DECIMAL(19,4) NOT NULL,
+    ContactPerson    NVARCHAR(100) NULL,
+    ContactPhone     NVARCHAR(20) NULL,
+    ContactEmail     NVARCHAR(100) NULL,
+    ContractSignedDate DATE NULL,
+    IsActive         BIT NOT NULL DEFAULT 1,
+    CreatedAt        DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_ElectricitySupplier PRIMARY KEY (SupplierID),
+    CONSTRAINT UQ_ElectricitySupplier_Code UNIQUE (SupplierCode),
+    CONSTRAINT FK_ElectricitySupplier_Region FOREIGN KEY (RegionID)
+        REFERENCES Infrastructure.Region(RegionID),
+    CONSTRAINT CK_ElectricitySupplier_Price CHECK (UnitPricePerKWh >= 0)
+);
+GO
+
 CREATE TABLE Infrastructure.ChargingStation
 (
     StationID       INT IDENTITY(1,1) NOT NULL,
@@ -93,6 +118,7 @@ CREATE TABLE Infrastructure.ChargingStation
     StationName     NVARCHAR(200) NOT NULL,
     FranchiseID     INT NOT NULL,
     AddressID       INT NOT NULL,
+    SupplierID      INT NULL,                          -- NEW: FK to ElectricitySupplier
     ModelName       NVARCHAR(100) NULL,
     Manufacturer    NVARCHAR(100) NULL,
     MaxPowerKW      DECIMAL(7,2) NULL,
@@ -112,6 +138,8 @@ CREATE TABLE Infrastructure.ChargingStation
         REFERENCES Infrastructure.Franchise(FranchiseID),
     CONSTRAINT FK_ChargingStation_Address FOREIGN KEY (AddressID)
         REFERENCES Infrastructure.Address(AddressID),
+    CONSTRAINT FK_ChargingStation_Supplier FOREIGN KEY (SupplierID)   -- NEW
+        REFERENCES Infrastructure.ElectricitySupplier(SupplierID),
     CONSTRAINT CK_ChargingStation_Lat CHECK (Latitude BETWEEN -90 AND 90),
     CONSTRAINT CK_ChargingStation_Lng CHECK (Longitude BETWEEN -180 AND 180),
     CONSTRAINT CK_ChargingStation_Status CHECK (StationStatus IN (N'Active', N'Inactive', N'UnderMaintenance', N'Retired'))
@@ -138,6 +166,23 @@ CREATE TABLE Infrastructure.ChargingPoint
         REFERENCES Infrastructure.ChargingStation(StationID),
     CONSTRAINT CK_ChargingPoint_Power CHECK (PowerKW > 0),
     CONSTRAINT CK_ChargingPoint_Status CHECK (PointStatus IN (N'Available', N'Busy', N'Error', N'Offline', N'Maintenance'))
+);
+GO
+
+-- ============================================================
+-- PointStatusLog (moved from trigger file)
+-- ============================================================
+CREATE TABLE Infrastructure.PointStatusLog
+(
+    LogID      BIGINT IDENTITY(1,1) NOT NULL,
+    PointID    INT NOT NULL,
+    OldStatus  NVARCHAR(20) NOT NULL,
+    NewStatus  NVARCHAR(20) NOT NULL,
+    ChangedAt  DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_PointStatusLog PRIMARY KEY (LogID),
+    CONSTRAINT FK_PointStatusLog_Point FOREIGN KEY (PointID)
+        REFERENCES Infrastructure.ChargingPoint(PointID)
 );
 GO
 
@@ -199,6 +244,56 @@ CREATE TABLE Users.Vehicle
 );
 GO
 
+-- ============================================================
+-- Notification (NEW)
+-- ============================================================
+CREATE TABLE Users.Notification
+(
+    NotificationID  INT IDENTITY(1,1) NOT NULL,
+    UserID          INT NOT NULL,
+    Title           NVARCHAR(200) NOT NULL,
+    Body            NVARCHAR(1000) NOT NULL,
+    Type            NVARCHAR(30) NOT NULL,
+    ReferenceType   NVARCHAR(30) NULL,
+    ReferenceID     BIGINT NULL,
+    IsRead          BIT NOT NULL DEFAULT 0,
+    CreatedAt       DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_Notification PRIMARY KEY (NotificationID),
+    CONSTRAINT FK_Notification_User FOREIGN KEY (UserID)
+        REFERENCES Users.[User](UserID),
+    CONSTRAINT CK_Notification_Type CHECK (Type IN (N'ChargingComplete', N'Payment', N'Promotion', N'System', N'Maintenance', N'Booking', N'WalletAlert'))
+);
+GO
+
+-- ============================================================
+-- ErrorLog (NEW - references Users.User, so placed here)
+-- ============================================================
+CREATE TABLE Infrastructure.ErrorLog
+(
+    ErrorID         INT IDENTITY(1,1) NOT NULL,
+    PointID         INT NULL,
+    StationID       INT NULL,
+    ErrorCode       NVARCHAR(30) NOT NULL,
+    Severity        NVARCHAR(10) NOT NULL DEFAULT N'Medium',
+    Description     NVARCHAR(500) NOT NULL,
+    OccurredAt      DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ResolvedAt      DATETIME2 NULL,
+    ResolvedBy      INT NULL,
+    ResolutionNotes NVARCHAR(500) NULL,
+    IsActive        BIT NOT NULL DEFAULT 1,
+
+    CONSTRAINT PK_ErrorLog PRIMARY KEY (ErrorID),
+    CONSTRAINT FK_ErrorLog_Point FOREIGN KEY (PointID)
+        REFERENCES Infrastructure.ChargingPoint(PointID),
+    CONSTRAINT FK_ErrorLog_Station FOREIGN KEY (StationID)
+        REFERENCES Infrastructure.ChargingStation(StationID),
+    CONSTRAINT FK_ErrorLog_ResolvedBy FOREIGN KEY (ResolvedBy)
+        REFERENCES Users.[User](UserID),
+    CONSTRAINT CK_ErrorLog_Severity CHECK (Severity IN (N'Low', N'Medium', N'High', N'Critical'))
+);
+GO
+
 PRINT N'Users tables created.';
 GO
 
@@ -231,6 +326,38 @@ CREATE TABLE Operations.PricingPolicy
 );
 GO
 
+-- ============================================================
+-- Booking (NEW)
+-- ============================================================
+CREATE TABLE Operations.Booking
+(
+    BookingID   INT IDENTITY(1,1) NOT NULL,
+    BookingCode NVARCHAR(30) NOT NULL,
+    UserID      INT NOT NULL,
+    PointID     INT NOT NULL,
+    StationID   INT NOT NULL,
+    VehicleID   INT NULL,
+    BookedFrom  DATETIME2 NOT NULL,
+    BookedTo    DATETIME2 NOT NULL,
+    Status      NVARCHAR(20) NOT NULL DEFAULT N'Pending',
+    CreatedAt   DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt   DATETIME2 NULL,
+
+    CONSTRAINT PK_Booking PRIMARY KEY (BookingID),
+    CONSTRAINT UQ_Booking_Code UNIQUE (BookingCode),
+    CONSTRAINT FK_Booking_User FOREIGN KEY (UserID)
+        REFERENCES Users.[User](UserID),
+    CONSTRAINT FK_Booking_Point FOREIGN KEY (PointID)
+        REFERENCES Infrastructure.ChargingPoint(PointID),
+    CONSTRAINT FK_Booking_Station FOREIGN KEY (StationID)
+        REFERENCES Infrastructure.ChargingStation(StationID),
+    CONSTRAINT FK_Booking_Vehicle FOREIGN KEY (VehicleID)
+        REFERENCES Users.Vehicle(VehicleID),
+    CONSTRAINT CK_Booking_Time CHECK (BookedFrom < BookedTo),
+    CONSTRAINT CK_Booking_Status CHECK (Status IN (N'Pending', N'Confirmed', N'Active', N'Completed', N'Cancelled', N'Expired'))
+);
+GO
+
 CREATE TABLE Operations.ChargingSession
 (
     SessionID                BIGINT IDENTITY(1,1) NOT NULL,
@@ -240,6 +367,7 @@ CREATE TABLE Operations.ChargingSession
     PointID                  INT NOT NULL,
     StationID                INT NOT NULL,
     PolicyID                 INT NOT NULL,
+    BookingID                INT NULL,                          -- NEW: FK to Booking
     StartTime                DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     EndTime                  DATETIME2 NULL,
     StartBatteryPercent      DECIMAL(5,2) NULL,
@@ -267,10 +395,66 @@ CREATE TABLE Operations.ChargingSession
         REFERENCES Infrastructure.ChargingStation(StationID),
     CONSTRAINT FK_ChargingSession_Policy FOREIGN KEY (PolicyID)
         REFERENCES Operations.PricingPolicy(PolicyID),
+    CONSTRAINT FK_ChargingSession_Booking FOREIGN KEY (BookingID)   -- NEW
+        REFERENCES Operations.Booking(BookingID),
     CONSTRAINT CK_ChargingSession_KWh CHECK (TotalKWh IS NULL OR TotalKWh >= 0),
     CONSTRAINT CK_ChargingSession_Time CHECK (EndTime IS NULL OR StartTime < EndTime),
     CONSTRAINT CK_ChargingSession_Status CHECK (SessionStatus IN ('Charging', 'Completed', 'Cancelled', 'Failed', 'Pending')),
     CONSTRAINT CK_ChargingSession_StopReason CHECK (StopReason IS NULL OR StopReason IN ('Completed', 'UserStopped', 'PaymentFailed', 'Error', 'Timeout', 'EmergencyStop', 'Maintenance', 'Other'))
+);
+GO
+
+-- ============================================================
+-- MaintenanceSchedule (NEW)
+-- ============================================================
+CREATE TABLE Operations.MaintenanceSchedule
+(
+    ScheduleID      INT IDENTITY(1,1) NOT NULL,
+    PointID         INT NULL,
+    StationID       INT NULL,
+    ScheduledBy     INT NOT NULL,
+    ScheduledFrom   DATETIME2 NOT NULL,
+    ScheduledTo     DATETIME2 NOT NULL,
+    MaintenanceType NVARCHAR(50) NOT NULL,
+    Description     NVARCHAR(500) NULL,
+    Status          NVARCHAR(20) NOT NULL DEFAULT N'Scheduled',
+    CompletedAt     DATETIME2 NULL,
+    Notes           NVARCHAR(1000) NULL,
+    CreatedAt       DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_MaintenanceSchedule PRIMARY KEY (ScheduleID),
+    CONSTRAINT FK_MaintenanceSchedule_Point FOREIGN KEY (PointID)
+        REFERENCES Infrastructure.ChargingPoint(PointID),
+    CONSTRAINT FK_MaintenanceSchedule_Station FOREIGN KEY (StationID)
+        REFERENCES Infrastructure.ChargingStation(StationID),
+    CONSTRAINT FK_MaintenanceSchedule_User FOREIGN KEY (ScheduledBy)
+        REFERENCES Users.[User](UserID),
+    CONSTRAINT CK_MaintenanceSchedule_Time CHECK (ScheduledFrom < ScheduledTo),
+    CONSTRAINT CK_MaintenanceSchedule_Type CHECK (MaintenanceType IN (N'Preventive', N'Corrective', N'Inspection', N'Upgrade')),
+    CONSTRAINT CK_MaintenanceSchedule_Status CHECK (Status IN (N'Scheduled', N'InProgress', N'Completed', N'Cancelled'))
+);
+GO
+
+-- ============================================================
+-- StationReview (NEW)
+-- ============================================================
+CREATE TABLE Operations.StationReview
+(
+    ReviewID   INT IDENTITY(1,1) NOT NULL,
+    UserID     INT NOT NULL,
+    StationID  INT NOT NULL,
+    Rating     INT NOT NULL,
+    Comment    NVARCHAR(1000) NULL,
+    CreatedAt  DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt  DATETIME2 NULL,
+
+    CONSTRAINT PK_StationReview PRIMARY KEY (ReviewID),
+    CONSTRAINT FK_StationReview_User FOREIGN KEY (UserID)
+        REFERENCES Users.[User](UserID),
+    CONSTRAINT FK_StationReview_Station FOREIGN KEY (StationID)
+        REFERENCES Infrastructure.ChargingStation(StationID),
+    CONSTRAINT UQ_StationReview_User_Station UNIQUE (UserID, StationID),
+    CONSTRAINT CK_StationReview_Rating CHECK (Rating BETWEEN 1 AND 5)
 );
 GO
 
@@ -358,9 +542,61 @@ PRINT N'Payments tables created.';
 GO
 
 -- ============================================================
+-- ErrorCatalog (for centralized error handling)
+-- ============================================================
+CREATE TABLE Infrastructure.ErrorCatalog
+(
+    ErrorCode    INT NOT NULL,
+    ErrorMessage NVARCHAR(500) NOT NULL,
+    Severity     NVARCHAR(10) NOT NULL DEFAULT N'Error',
+
+    CONSTRAINT PK_ErrorCatalog PRIMARY KEY (ErrorCode),
+    CONSTRAINT CK_ErrorCatalog_Severity CHECK (Severity IN (N'Info', N'Warning', N'Error', N'Critical'))
+);
+GO
+
+-- Seed ErrorCatalog
+INSERT INTO Infrastructure.ErrorCatalog (ErrorCode, ErrorMessage, Severity) VALUES
+    -- ChargingPoint errors (50001-50009)
+    (50001, N'Charging point not found', 'Error'),
+    (50002, N'Charging point is not available', 'Error'),
+    (50003, N'User account is not active', 'Error'),
+    (50004, N'Station is not active', 'Error'),
+    (50005, N'No active pricing policy', 'Error'),
+    -- Session errors (50010-50019)
+    (50010, N'Session not found', 'Error'),
+    (50011, N'Session is not in Charging status', 'Error'),
+    (50012, N'Cannot cancel session in current status', 'Error'),
+    -- Payment errors (50020-50029)
+    (50020, N'Session not found', 'Error'),
+    (50021, N'Session must be completed before payment', 'Error'),
+    (50022, N'Session does not belong to user', 'Error'),
+    (50023, N'Invalid payment amount', 'Error'),
+    (50024, N'Payment already completed for this session', 'Error'),
+    (50025, N'No active wallet found', 'Error'),
+    (50026, N'Insufficient wallet balance', 'Error'),
+    -- Booking errors (50030-50039)
+    (50030, N'Time slot is not available', 'Error'),
+    (50031, N'Booking not found', 'Error'),
+    (50032, N'Booking cannot be modified in current status', 'Error'),
+    (50033, N'Booking is already confirmed', 'Error'),
+    -- Maintenance errors (50040-50049)
+    (50040, N'Maintenance schedule overlaps with active booking', 'Error'),
+    (50041, N'Maintenance schedule not found', 'Error'),
+    (50042, N'Maintenance schedule cannot be modified in current status', 'Error'),
+    -- Validation errors (50050-50059)
+    (50050, N'Invalid input data', 'Error'),
+    (50051, N'Duplicate entry', 'Error');
+GO
+
+PRINT N'ErrorCatalog seeded.';
+GO
+
+-- ============================================================
 -- INDEXES
 -- ============================================================
 
+-- Existing indexes (unchanged)
 CREATE NONCLUSTERED INDEX IX_Region_CountryID ON Infrastructure.Region(CountryID);
 CREATE NONCLUSTERED INDEX IX_Address_RegionID ON Infrastructure.Address(RegionID);
 CREATE NONCLUSTERED INDEX IX_Franchise_AddressID ON Infrastructure.Franchise(AddressID);
@@ -386,5 +622,43 @@ CREATE NONCLUSTERED INDEX IX_Transaction_SessionID ON Payments.[Transaction](Ses
 CREATE NONCLUSTERED INDEX IX_Transaction_Status ON Payments.[Transaction](TransactionStatus);
 CREATE NONCLUSTERED INDEX IX_WalletTransaction_WalletID ON Payments.WalletTransaction(WalletID);
 
-PRINT N'Indexes created.';
+-- New indexes
+-- ElectricitySupplier
+CREATE NONCLUSTERED INDEX IX_ElectricitySupplier_Region ON Infrastructure.ElectricitySupplier(RegionID);
+
+-- ErrorLog
+CREATE NONCLUSTERED INDEX IX_ErrorLog_PointID ON Infrastructure.ErrorLog(PointID);
+CREATE NONCLUSTERED INDEX IX_ErrorLog_StationID ON Infrastructure.ErrorLog(StationID);
+CREATE NONCLUSTERED INDEX IX_ErrorLog_Severity ON Infrastructure.ErrorLog(Severity) WHERE IsActive = 1;
+
+-- PointStatusLog
+CREATE NONCLUSTERED INDEX IX_PointStatusLog_PointID ON Infrastructure.PointStatusLog(PointID);
+CREATE NONCLUSTERED INDEX IX_PointStatusLog_ChangedAt ON Infrastructure.PointStatusLog(ChangedAt DESC);
+
+-- Booking
+CREATE NONCLUSTERED INDEX IX_Booking_UserID ON Operations.Booking(UserID);
+CREATE NONCLUSTERED INDEX IX_Booking_PointID ON Operations.Booking(PointID);
+CREATE NONCLUSTERED INDEX IX_Booking_Status ON Operations.Booking(Status);
+CREATE NONCLUSTERED INDEX IX_Booking_TimeRange ON Operations.Booking(PointID, BookedFrom, BookedTo) WHERE Status IN (N'Pending', N'Confirmed', N'Active');
+
+-- MaintenanceSchedule
+CREATE NONCLUSTERED INDEX IX_Maintenance_PointID ON Operations.MaintenanceSchedule(PointID);
+CREATE NONCLUSTERED INDEX IX_Maintenance_StationID ON Operations.MaintenanceSchedule(StationID);
+CREATE NONCLUSTERED INDEX IX_Maintenance_Status ON Operations.MaintenanceSchedule(Status);
+CREATE NONCLUSTERED INDEX IX_Maintenance_TimeRange ON Operations.MaintenanceSchedule(ScheduledFrom, ScheduledTo);
+
+-- Notification
+CREATE NONCLUSTERED INDEX IX_Notification_User_Unread ON Users.Notification(UserID, IsRead) INCLUDE (CreatedAt);
+CREATE NONCLUSTERED INDEX IX_Notification_CreatedAt ON Users.Notification(CreatedAt DESC);
+
+-- StationReview
+CREATE UNIQUE NONCLUSTERED INDEX UQ_Review_User_Station ON Operations.StationReview(UserID, StationID);
+
+-- ChargingStation_Supplier
+CREATE NONCLUSTERED INDEX IX_ChargingStation_SupplierID ON Infrastructure.ChargingStation(SupplierID);
+
+-- ChargingSession_Booking
+CREATE NONCLUSTERED INDEX IX_ChargingSession_BookingID ON Operations.ChargingSession(BookingID);
+
+PRINT N'All indexes created.';
 GO

@@ -68,6 +68,70 @@ exports.getMyTransactions = asyncHandler(async (req, res) => {
   res.json(successResponse(txns));
 });
 
+// Booking flows
+const bookingService = require('../services/BookingService');
+
+exports.createBooking = asyncHandler(async (req, res) => {
+  const result = await bookingService.createBooking({ ...req.body, UserID: req.user.UserID });
+  res.status(201).json(result);
+});
+
+exports.confirmBooking = asyncHandler(async (req, res) => {
+  const result = await bookingService.confirmBooking(req.params.id);
+  res.json(result);
+});
+
+exports.cancelBooking = asyncHandler(async (req, res) => {
+  const result = await bookingService.cancelBooking(req.params.id, req.body.reason);
+  res.json(result);
+});
+
+exports.checkPointAvailability = asyncHandler(async (req, res) => {
+  const result = await bookingService.checkAvailability(req.query.pointId, req.query.startTime, req.query.endTime);
+  res.json(result);
+});
+
+// Maintenance flows
+const maintenanceService = require('../services/MaintenanceService');
+
+exports.scheduleMaintenance = asyncHandler(async (req, res) => {
+  const result = await maintenanceService.scheduleMaintenance(req.body);
+  res.status(201).json(result);
+});
+
+exports.completeMaintenance = asyncHandler(async (req, res) => {
+  const result = await maintenanceService.completeMaintenance(req.params.id, { ...req.body, CompletedBy: req.user.UserID });
+  res.json(result);
+});
+
+exports.getUpcomingMaintenance = asyncHandler(async (req, res) => {
+  const result = await maintenanceService.getUpcoming(req.query.days);
+  res.json(result);
+});
+
+exports.resolveError = asyncHandler(async (req, res) => {
+  const result = await maintenanceService.resolveError(req.params.id, { ResolvedBy: req.user.UserID });
+  res.json(result);
+});
+
+// Notification flows
+const notificationService = require('../services/NotificationService');
+
+exports.getUserNotifications = asyncHandler(async (req, res) => {
+  const result = await notificationService.getUserNotifications(req.user.UserID, req.query);
+  res.json(result);
+});
+
+exports.markNotificationRead = asyncHandler(async (req, res) => {
+  const result = await notificationService.markRead(req.params.id, req.user.UserID);
+  res.json(result);
+});
+
+exports.getUnreadNotificationCount = asyncHandler(async (req, res) => {
+  const result = await notificationService.getUnreadCount(req.user.UserID);
+  res.json(result);
+});
+
 // Dashboard
 exports.getStationDashboard = asyncHandler(async (req, res) => {
   const result = await dashboardService.getStationDashboard(req.params.id, req.query.days);
