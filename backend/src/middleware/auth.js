@@ -17,26 +17,14 @@ function authenticate(req, res, next) {
   }
 }
 
-function optionalAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.split(' ')[1];
-      req.user = jwt.verify(token, authConfig.jwtSecret);
-    } catch (_) { /* ignore */ }
-  }
-  next();
-}
-
 function authorize(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user) throw new UnauthorizedError();
-    const hasRole = req.user.roles?.some(r => allowedRoles.includes(r));
-    if (!hasRole && !allowedRoles.includes('*')) {
+    if (!allowedRoles.includes(req.user.Role) && !allowedRoles.includes('*')) {
       throw new UnauthorizedError('Insufficient permissions');
     }
     next();
   };
 }
 
-module.exports = { authenticate, optionalAuth, authorize };
+module.exports = { authenticate, authorize };

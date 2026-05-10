@@ -1,4 +1,4 @@
-const { query, sql } = require('../config/database');
+const { query } = require('../config/database');
 
 class BaseRepository {
   constructor(tableName, schemaName, primaryKey, modelClass) {
@@ -6,31 +6,18 @@ class BaseRepository {
     this.schemaName = schemaName;
     this.primaryKey = primaryKey;
     this.modelClass = modelClass;
-    this.auditColumns = 'CreatedAt, UpdatedAt, IsDeleted, DeletedAt';
   }
 
   async findAll(filters = {}) {
     let q = `SELECT * FROM ${this.tableName} WHERE 1=1`;
     const params = {};
-    if (filters.isDeleted !== undefined) {
-      q += ` AND IsDeleted = @IsDeleted`;
-      params.IsDeleted = filters.isDeleted ? 1 : 0;
-    } else {
-      q += ` AND IsDeleted = 0`;
-    }
     if (filters.isActive !== undefined) {
-      if (await this._hasColumn('IsActive')) {
-        q += ` AND IsActive = @IsActive`;
-        params.IsActive = filters.IsActive ?? 1;
-      }
+      q += ` AND IsActive = @IsActive`;
+      params.IsActive = filters.isActive ? 1 : 0;
     }
     if (filters.status) {
       q += ` AND ${this._getStatusColumn()} = @Status`;
       params.Status = filters.status;
-    }
-    if (filters.search) {
-      q += ` AND (CAST(${this.primaryKey} AS NVARCHAR) LIKE @Search OR 1=0)`;
-      params.Search = `%${filters.search}%`;
     }
     if (filters.page && filters.limit) {
       const offset = (filters.page - 1) * filters.limit;
@@ -43,7 +30,7 @@ class BaseRepository {
   }
 
   async findById(id) {
-    const q = `SELECT * FROM ${this.tableName} WHERE ${this.primaryKey} = @Id AND IsDeleted = 0`;
+    const q = `SELECT * FROM ${this.tableName} WHERE ${this.primaryKey} = @Id AND IsActive = 1`;
     const result = await query(q, { Id: id });
     if (!result.recordset || result.recordset.length === 0) return null;
     return new this.modelClass(result.recordset[0]);
@@ -62,36 +49,20 @@ class BaseRepository {
   async update(id, data) {
     const columns = Object.keys(data).filter(k => k !== this.primaryKey && !k.startsWith('_'));
     const setClause = columns.map(c => `[${c}] = @${c}`).join(', ');
-    const q = `UPDATE ${this.tableName} SET ${setClause}, UpdatedAt = SYSDATETIME() OUTPUT INSERTED.* WHERE ${this.primaryKey} = @Id AND IsDeleted = 0`;
+    const q = `UPDATE ${this.tableName} SET ${setClause}, UpdatedAt = SYSDATETIME() OUTPUT INSERTED.* WHERE ${this.primaryKey} = @Id`;
     const result = await query(q, { ...data, Id: id });
     if (!result.recordset || result.recordset.length === 0) return null;
     return new this.modelClass(result.recordset[0]);
   }
 
-  async delete(id, soft = true) {
-    if (soft) {
-      const q = `UPDATE ${this.tableName} SET IsDeleted = 1, DeletedAt = SYSDATETIME(), UpdatedAt = SYSDATETIME() WHERE ${this.primaryKey} = @Id`;
-      return query(q, { Id: id });
-    } else {
-      const q = `DELETE FROM ${this.tableName} WHERE ${this.primaryKey} = @Id`;
-      return query(q, { Id: id });
-    }
-  }
-
-  async count(filters = {}) {
-    let q = `SELECT COUNT(*) AS Total FROM ${this.tableName} WHERE IsDeleted = 0`;
-    const params = {};
-    if (filters.status) {
-      q += ` AND ${this._getStatusColumn()} = @Status`;
-      params.Status = filters.status;
-    }
-    const result = await query(q, params);
-    return result.recordset[0]?.Total || 0;
+  async delete(id) {
+    const q = `UPDATE ${this.tableName} SET IsActive = 0, UpdatedAt = SYSDATETIME() WHERE ${this.primaryKey} = @Id`;
+    return query(q, { Id: id });
   }
 
   async findBy(conditions) {
     const clauses = Object.entries(conditions).map(([k]) => `[${k}] = @${k}`);
-    const q = `SELECT * FROM ${this.tableName} WHERE ${clauses.join(' AND ')} AND IsDeleted = 0`;
+    const q = `SELECT * FROM ${this.tableName} WHERE ${clauses.join(' AND ')} AND IsActive = 1`;
     const result = await query(q, conditions);
     return (result.recordset || []).map(r => new this.modelClass(r));
   }
@@ -101,20 +72,23 @@ class BaseRepository {
     return results.length > 0 ? results[0] : null;
   }
 
-  async exists(id) {
-    const q = `SELECT COUNT(*) AS Cnt FROM ${this.tableName} WHERE ${this.primaryKey} = @Id AND IsDeleted = 0`;
-    const result = await query(q, { Id: id });
-    return (result.recordset[0]?.Cnt || 0) > 0;
-  }
-
-  async _hasColumn(colName) {
-    const q = `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = @Schema AND TABLE_NAME = @Table AND COLUMN_NAME = @Col`;
-    const result = await query(q, { Schema: this.schemaName, Table: this.tableName.replace(/[\[\]]/g, '').split('.')[1], Col: colName });
-    return result.recordset.length > 0;
+  async count(filters = {}) {
+    let q = `SELECT COUNT(*) AS Total FROM ${this.tableName} WHERE 1=1`;
+    const params = {};
+    if (filters.isActive !== undefined) {
+      q += ` AND IsActive = @IsActive`;
+      params.IsActive = filters.isActive ? 1 : 0;
+    }
+    if (filters.status) {
+      q += ` AND ${this._getStatusColumn()} = @Status`;
+      params.Status = filters.status;
+    }
+    const result = await query(q, params);
+    return result.recordset[0]?.Total || 0;
   }
 
   _getStatusColumn() {
-    const statusCols = ['SessionStatus', 'TransactionStatus', 'PointStatus', 'StationStatus', 'ScheduleStatus', 'InvoiceStatus', 'AlertStatus', 'AccountStatus', 'Status'];
+    const statusCols = ['SessionStatus', 'TransactionStatus', 'PointStatus', 'StationStatus', 'AccountStatus', 'ScheduleStatus'];
     return statusCols[0];
   }
 }

@@ -2,8 +2,16 @@ function success(data, message = 'Success') {
   return { success: true, message, data };
 }
 
+function successResponse(data, message = 'Success') {
+  return { success: true, message, data };
+}
+
 function fail(message = 'Internal server error', statusCode = 500) {
   return { success: false, message, error: message };
+}
+
+function errorResponse(message = 'Internal server error', statusCode = 500) {
+  return { success: false, message, statusCode };
 }
 
 class AppError extends Error {
@@ -35,8 +43,21 @@ class ValidationError extends AppError {
   constructor(message = 'Validation failed') { super(message, 422); }
 }
 
+function paginatedResponse(data, total, page, limit) {
+  return {
+    success: true,
+    data,
+    pagination: {
+      total,
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 10,
+      totalPages: Math.ceil(total / (parseInt(limit) || 10)),
+    },
+  };
+}
+
 module.exports = {
-  success, fail,
+  success, successResponse, fail, errorResponse, paginatedResponse,
   AppError, BadRequestError, UnauthorizedError,
   NotFoundError, ConflictError, ValidationError,
 };

@@ -11,3 +11,13 @@ exports.signin = asyncHandler(async (req, res) => {
   const result = await authService.signin(req.body);
   res.json(success(result, 'Login successful'));
 });
+
+exports.forgotPassword = asyncHandler(async (req, res) => {
+  const result = await authService.forgotPassword(req.body);
+  res.json(success(result, 'Password reset email sent'));
+});
+
+exports.resetPassword = asyncHandler(async (req, res) => {
+  const result = await authService.resetPassword(req.body);
+  res.json(success(result, 'Password reset successful'));
+});

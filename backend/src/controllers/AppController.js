@@ -31,14 +31,13 @@ exports.getMySessions = asyncHandler(async (req, res) => {
 });
 
 exports.getSessionById = asyncHandler(async (req, res) => {
-  const result = await query(`SELECT cs.*, u.Username, up.FullName, s.StationName, p.PointCode, v.PlateNumber
+  const result = await query(`SELECT cs.*, u.Username, u.FullName, s.StationName, p.PointCode, v.PlateNumber
     FROM [Operations].[ChargingSession] cs
     JOIN [Users].[User] u ON cs.UserID = u.UserID
-    LEFT JOIN [Users].[UserProfile] up ON u.UserID = up.UserID
     JOIN [Infrastructure].[ChargingStation] s ON cs.StationID = s.StationID
     JOIN [Infrastructure].[ChargingPoint] p ON cs.PointID = p.PointID
     LEFT JOIN [Users].[Vehicle] v ON cs.VehicleID = v.VehicleID
-    WHERE cs.SessionID = @ID AND cs.IsDeleted = 0`, { ID: req.params.id });
+    WHERE cs.SessionID = @ID`, { ID: req.params.id });
   if (result.recordset.length === 0) throw new NotFoundError('Session');
   res.json(successResponse(result.recordset[0]));
 });
@@ -52,11 +51,6 @@ exports.getSessionHistory = asyncHandler(async (req, res) => {
 exports.createPayment = asyncHandler(async (req, res) => {
   const result = await paymentService.createPayment({ ...req.body, UserID: req.user.UserID });
   res.status(201).json(result);
-});
-
-exports.processRefund = asyncHandler(async (req, res) => {
-  const result = await paymentService.processRefund(req.body);
-  res.json(result);
 });
 
 exports.getMyWallet = asyncHandler(async (req, res) => {

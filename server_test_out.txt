@@ -1,0 +1,6 @@
+DB Config:
+  SERVER: localhost
+  PORT: 1433
+  USER: sa
+  DATABASE: EV_Charging_System
+Database connected successfully

@@ -27,29 +27,10 @@ const authController = require('../controllers/auth.controller');
  *         description: Email already exists
  */
 router.post('/signup', authController.signup);
-
-/**
- * @swagger
- * /api/auth/signin:
- *   post:
- *     tags: [Authentication]
- *     summary: Sign in with email and password
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/SignInRequest'
- *     responses:
- *       200:
- *         description: Login successful
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/AuthResponse'
- *       401:
- *         description: Invalid credentials
- */
+router.post('/register', authController.signup);
 router.post('/signin', authController.signin);
+router.post('/login', authController.signin);
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/reset-password', authController.resetPassword);
 
 module.exports = router;

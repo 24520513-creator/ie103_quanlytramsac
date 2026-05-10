@@ -1,0 +1,31 @@
+IF DB_ID(N'EV_Charging_System') IS NOT NULL
+BEGIN
+    ALTER DATABASE EV_Charging_System SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE EV_Charging_System;
+END
+GO
+
+CREATE DATABASE EV_Charging_System
+COLLATE Latin1_General_CI_AS;
+GO
+
+ALTER DATABASE EV_Charging_System SET RECOVERY SIMPLE;
+ALTER DATABASE EV_Charging_System SET READ_COMMITTED_SNAPSHOT ON;
+GO
+
+USE EV_Charging_System;
+GO
+
+CREATE SCHEMA Infrastructure;
+GO
+CREATE SCHEMA Users;
+GO
+CREATE SCHEMA Operations;
+GO
+CREATE SCHEMA Payments;
+GO
+CREATE SCHEMA Reporting;
+GO
+
+PRINT N'Database EV_Charging_System created with 5 schemas.';
+GO

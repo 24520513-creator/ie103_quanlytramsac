@@ -16,16 +16,6 @@ exports.login = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
-exports.refreshToken = asyncHandler(async (req, res) => {
-  const result = await authService.refreshToken(req.body.refreshToken);
-  res.json(result);
-});
-
-exports.logout = asyncHandler(async (req, res) => {
-  await authService.logout(req.user.UserID);
-  res.json(successResponse(null, 'Logged out successfully'));
-});
-
 exports.getProfile = asyncHandler(async (req, res) => {
   const profile = await authService.getProfile(req.user.UserID);
   res.json(successResponse(profile));
@@ -34,4 +24,14 @@ exports.getProfile = asyncHandler(async (req, res) => {
 exports.updateProfile = asyncHandler(async (req, res) => {
   const profile = await authService.updateProfile(req.user.UserID, req.body);
   res.json(successResponse(profile, 'Profile updated'));
+});
+
+exports.forgotPassword = asyncHandler(async (req, res) => {
+  const result = await authService.forgotPassword(req.body);
+  res.json(successResponse(result, 'Password reset email sent'));
+});
+
+exports.resetPassword = asyncHandler(async (req, res) => {
+  const result = await authService.resetPassword(req.body);
+  res.json(successResponse(result, 'Password reset successful'));
 });
