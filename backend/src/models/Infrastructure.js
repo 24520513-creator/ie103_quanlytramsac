@@ -42,6 +42,7 @@ class Address extends BaseModel {
       this.Longitude = row.Longitude;
       this.FullAddress = row.FullAddress;
       this.IsActive = row.IsActive ?? true;
+      this.CreatedAt = row.CreatedAt;
     }
   }
 }
@@ -61,6 +62,7 @@ class Franchise extends BaseModel {
       this.RevenueShareRate = row.RevenueShareRate;
       this.ContractSignedDate = row.ContractSignedDate;
       this.IsActive = row.IsActive ?? true;
+      this.CreatedAt = row.CreatedAt;
     }
   }
 }
@@ -74,6 +76,7 @@ class ChargingStation extends BaseModel {
       this.StationName = row.StationName;
       this.FranchiseID = row.FranchiseID;
       this.AddressID = row.AddressID;
+      this.SupplierID = row.SupplierID;
       this.ModelName = row.ModelName;
       this.Manufacturer = row.Manufacturer;
       this.MaxPowerKW = row.MaxPowerKW;
@@ -84,6 +87,8 @@ class ChargingStation extends BaseModel {
       this.ImageUrl = row.ImageUrl;
       this.Notes = row.Notes;
       this.IsActive = row.IsActive ?? true;
+      this.CreatedAt = row.CreatedAt;
+      this.UpdatedAt = row.UpdatedAt;
     }
   }
 }
@@ -100,6 +105,8 @@ class ChargingPoint extends BaseModel {
       this.SerialNumber = row.SerialNumber;
       this.PointStatus = row.PointStatus;
       this.IsActive = row.IsActive ?? true;
+      this.CreatedAt = row.CreatedAt;
+      this.UpdatedAt = row.UpdatedAt;
     }
   }
 }
@@ -111,11 +118,14 @@ class ElectricitySupplier extends BaseModel {
       this.SupplierID = row.SupplierID;
       this.SupplierCode = row.SupplierCode;
       this.SupplierName = row.SupplierName;
-      this.CountryID = row.CountryID;
+      this.RegionID = row.RegionID;
+      this.UnitPricePerKWh = row.UnitPricePerKWh;
       this.ContactPerson = row.ContactPerson;
       this.ContactPhone = row.ContactPhone;
       this.ContactEmail = row.ContactEmail;
+      this.ContractSignedDate = row.ContractSignedDate;
       this.IsActive = row.IsActive ?? true;
+      this.CreatedAt = row.CreatedAt;
     }
   }
 }
@@ -124,17 +134,17 @@ class ErrorLog extends BaseModel {
   constructor(row) {
     super();
     if (row) {
-      this.ErrorLogID = row.ErrorLogID;
+      this.ErrorID = row.ErrorID;
       this.PointID = row.PointID;
-      this.SessionID = row.SessionID;
+      this.StationID = row.StationID;
       this.ErrorCode = row.ErrorCode;
       this.Severity = row.Severity;
-      this.Message = row.Message;
-      this.ErrorSource = row.ErrorSource;
-      this.IsResolved = row.IsResolved ?? false;
+      this.Description = row.Description;
+      this.OccurredAt = row.OccurredAt;
+      this.IsActive = row.IsActive ?? true;
       this.ResolvedAt = row.ResolvedAt;
       this.ResolvedBy = row.ResolvedBy;
-      this.CreatedAt = row.CreatedAt;
+      this.ResolutionNotes = row.ResolutionNotes;
     }
   }
 }

@@ -12,7 +12,7 @@ const FranchiseRepository = new BaseRepository('Franchise', 'Infrastructure', 'F
 const ChargingStationRepository = new BaseRepository('ChargingStation', 'Infrastructure', 'StationID', ChargingStation);
 const ChargingPointRepository = new BaseRepository('ChargingPoint', 'Infrastructure', 'PointID', ChargingPoint);
 const ElectricitySupplierRepository = new BaseRepository('ElectricitySupplier', 'Infrastructure', 'SupplierID', ElectricitySupplier);
-const ErrorLogRepository = new BaseRepository('ErrorLog', 'Infrastructure', 'ErrorLogID', ErrorLog);
+const ErrorLogRepository = new BaseRepository('ErrorLog', 'Infrastructure', 'ErrorID', ErrorLog);
 
 module.exports = {
   CountryRepository, RegionRepository, AddressRepository,

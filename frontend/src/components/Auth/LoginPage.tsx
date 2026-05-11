@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Zap } from 'lucide-react';
 import { api } from '../../services/api';
+import { connectSocket } from '../../services/socket';
 
 const roleMap: Record<string, string> = {
   Customer: 'client', Manager: 'manager', Admin: 'admin',
@@ -28,6 +29,7 @@ export default function LoginPage() {
       const user = res.user;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
+      connectSocket(token);
       const frontendRole = roleMap[user.Role] || 'client';
       navigate(`/${frontendRole}/dashboard`);
     } catch (err: any) {

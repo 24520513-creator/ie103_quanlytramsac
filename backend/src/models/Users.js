@@ -36,6 +36,8 @@ class Vehicle extends BaseModel {
       this.BatteryCapacityKWh = row.BatteryCapacityKWh;
       this.ConnectorType = row.ConnectorType;
       this.IsActive = row.IsActive ?? true;
+      this.CreatedAt = row.CreatedAt;
+      this.UpdatedAt = row.UpdatedAt;
     }
   }
 }
@@ -47,12 +49,11 @@ class Notification extends BaseModel {
       this.NotificationID = row.NotificationID;
       this.UserID = row.UserID;
       this.Title = row.Title;
-      this.Message = row.Message;
-      this.NotificationType = row.NotificationType;
+      this.Body = row.Body;
+      this.Type = row.Type;
       this.ReferenceType = row.ReferenceType;
       this.ReferenceID = row.ReferenceID;
       this.IsRead = row.IsRead ?? false;
-      this.ReadAt = row.ReadAt;
       this.CreatedAt = row.CreatedAt;
     }
   }

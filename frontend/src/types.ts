@@ -18,7 +18,8 @@ export interface ElectricitySupplier {
   SupplierID: number;
   SupplierCode: string;
   SupplierName: string;
-  CountryID?: number;
+  RegionID?: number;
+  UnitPricePerKWh?: number;
   ContactPerson?: string;
   ContactPhone?: string;
   ContactEmail?: string;
@@ -116,7 +117,6 @@ export interface ChargingSession {
   CurrencyCode?: string;
   StopReason?: string;
   SessionStatus: 'Charging' | 'Completed' | 'Cancelled' | 'Failed' | 'Pending';
-  // Joined fields
   Username?: string;
   FullName?: string;
   StationName?: string;
@@ -153,34 +153,31 @@ export interface Wallet {
 }
 
 export interface ErrorLog {
-  ErrorLogID: number;
+  ErrorID: number;
   PointID?: number;
-  SessionID?: number;
   StationID?: number;
+  SessionID?: number;
   ErrorCode: string;
   Severity: 'Low' | 'Medium' | 'High' | 'Critical';
-  Message?: string;
-  ErrorSource?: string;
-  IsResolved?: boolean;
+  Description?: string;
+  OccurredAt?: string;
+  IsActive?: boolean;
   ResolvedAt?: string;
   ResolvedBy?: number;
-  CreatedAt?: string;
+  ResolutionNotes?: string;
   PointCode?: string;
 }
 
 export interface Booking {
   BookingID: number;
+  BookingCode?: string;
   UserID: number;
   PointID: number;
   StationID: number;
   VehicleID?: number;
-  BookingTime?: string;
-  StartTime: string;
-  EndTime: string;
+  BookedFrom: string;
+  BookedTo: string;
   Status: 'Pending' | 'Confirmed' | 'Cancelled' | 'Completed';
-  Notes?: string;
-  CancelledAt?: string;
-  CancelReason?: string;
   CreatedAt?: string;
   StationName?: string;
   PointCode?: string;
@@ -188,18 +185,17 @@ export interface Booking {
 }
 
 export interface MaintenanceSchedule {
-  MaintenanceID: number;
+  ScheduleID: number;
   StationID: number;
   PointID?: number;
-  ScheduledDate: string;
+  ScheduledBy?: number;
+  ScheduledFrom: string;
+  ScheduledTo: string;
   MaintenanceType: string;
   Description?: string;
-  PartsUsed?: string;
-  Cost?: number;
-  Priority: string;
   Status: 'Scheduled' | 'InProgress' | 'Completed' | 'Cancelled';
   CompletedAt?: string;
-  CompletedBy?: number;
+  Notes?: string;
   CreatedAt?: string;
   StationCode?: string;
   StationName?: string;
@@ -221,11 +217,10 @@ export interface Notification {
   NotificationID: number;
   UserID: number;
   Title: string;
-  Message: string;
-  NotificationType: string;
+  Body?: string;
+  Type: string;
   ReferenceType?: string;
   ReferenceID?: number;
   IsRead: boolean;
-  ReadAt?: string;
   CreatedAt?: string;
 }

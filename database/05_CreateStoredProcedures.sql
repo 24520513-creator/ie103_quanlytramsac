@@ -245,11 +245,12 @@ END;
 GO
 
 -- ============================================================
--- sp_CreateBooking (NEW)
+-- sp_CreateBooking (UPDATED: added @StationID param, PointStatus check)
 -- ============================================================
 CREATE OR ALTER PROCEDURE Operations.sp_CreateBooking
     @UserID     INT,
     @PointID    INT,
+    @StationID  INT = NULL,
     @VehicleID  INT = NULL,
     @BookedFrom DATETIME2,
     @BookedTo   DATETIME2
@@ -267,12 +268,17 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM Users.[User] WHERE UserID = @UserID AND AccountStatus = 'Active')
             EXEC dbo.sp_ThrowError 50003;
 
-        DECLARE @StationID INT, @PointStatus NVARCHAR(20);
-        SELECT @StationID = StationID, @PointStatus = PointStatus
+        DECLARE @ActualStationID INT, @PointStatus NVARCHAR(20);
+        SELECT @ActualStationID = StationID, @PointStatus = PointStatus
         FROM Infrastructure.ChargingPoint WHERE PointID = @PointID AND IsActive = 1;
 
         IF @PointStatus IS NULL
             EXEC dbo.sp_ThrowError 50001;
+        IF @PointStatus != 'Available'
+            EXEC dbo.sp_ThrowError 50002;
+
+        -- Use provided StationID or derive from point
+        SET @StationID = COALESCE(@StationID, @ActualStationID);
 
         IF Operations.fn_IsPointAvailable(@PointID, @BookedFrom, @BookedTo) = 0
             EXEC dbo.sp_ThrowError 50030;
@@ -327,7 +333,7 @@ END;
 GO
 
 -- ============================================================
--- sp_CancelBooking (NEW)
+-- sp_CancelBooking (UPDATED: only Pending/Confirmed can be cancelled)
 -- ============================================================
 CREATE OR ALTER PROCEDURE Operations.sp_CancelBooking
     @BookingID INT
@@ -340,7 +346,7 @@ BEGIN
 
     IF @Status IS NULL
         EXEC dbo.sp_ThrowError 50031;
-    IF @Status IN (N'Completed', N'Cancelled', N'Expired')
+    IF @Status NOT IN (N'Pending', N'Confirmed')
         EXEC dbo.sp_ThrowError 50032;
 
     UPDATE Operations.Booking SET Status = N'Cancelled', UpdatedAt = SYSDATETIME()
@@ -392,11 +398,11 @@ END;
 GO
 
 -- ============================================================
--- sp_ResolveError (NEW)
+-- sp_ResolveError (UPDATED: @ResolvedBy is optional)
 -- ============================================================
 CREATE OR ALTER PROCEDURE Infrastructure.sp_ResolveError
-    @ErrorID        INT,
-    @ResolvedBy     INT,
+    @ErrorID         INT,
+    @ResolvedBy      INT = NULL,
     @ResolutionNotes NVARCHAR(500) = NULL
 AS
 BEGIN
@@ -489,11 +495,12 @@ END;
 GO
 
 -- ============================================================
--- sp_CompleteMaintenance (NEW)
+-- sp_CompleteMaintenance (UPDATED: added @CompletedAt param)
 -- ============================================================
 CREATE OR ALTER PROCEDURE Operations.sp_CompleteMaintenance
-    @ScheduleID INT,
-    @Notes      NVARCHAR(1000) = NULL
+    @ScheduleID  INT,
+    @Notes       NVARCHAR(1000) = NULL,
+    @CompletedAt DATETIME2 = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -507,7 +514,7 @@ BEGIN
         EXEC dbo.sp_ThrowError 50042;
 
     UPDATE Operations.MaintenanceSchedule
-    SET Status = N'Completed', CompletedAt = SYSDATETIME(), Notes = @Notes
+    SET Status = N'Completed', CompletedAt = ISNULL(@CompletedAt, SYSDATETIME()), Notes = @Notes
     WHERE ScheduleID = @ScheduleID;
 
     -- Restore point
@@ -540,7 +547,7 @@ END;
 GO
 
 -- ============================================================
--- sp_CreateNotification (NEW - helper called by triggers)
+-- sp_CreateNotification (UPDATED: returns full record)
 -- ============================================================
 CREATE OR ALTER PROCEDURE Users.sp_CreateNotification
     @UserID       INT,
@@ -553,21 +560,23 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Users.Notification (UserID, Title, Body, Type, ReferenceType, ReferenceID, CreatedAt)
-    VALUES (@UserID, @Title, @Body, @Type, @ReferenceType, @ReferenceID, SYSDATETIME());
+    INSERT INTO Users.Notification (UserID, Title, Body, Type, ReferenceType, ReferenceID, IsRead, CreatedAt)
+    VALUES (@UserID, @Title, @Body, @Type, @ReferenceType, @ReferenceID, 0, SYSDATETIME());
 
-    SELECT SCOPE_IDENTITY() AS NotificationID;
+    DECLARE @NotificationID INT = SCOPE_IDENTITY();
+    SELECT * FROM Users.Notification WHERE NotificationID = @NotificationID;
 END;
 GO
 
 -- ============================================================
--- sp_GetUserNotifications (NEW)
+-- sp_GetUserNotifications (UPDATED: added @Type filter)
 -- ============================================================
 CREATE OR ALTER PROCEDURE Users.sp_GetUserNotifications
-    @UserID  INT,
+    @UserID     INT,
     @UnreadOnly BIT = 0,
-    @Page    INT = 1,
-    @Limit   INT = 20
+    @Type       NVARCHAR(30) = NULL,
+    @Page       INT = 1,
+    @Limit      INT = 20
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -578,29 +587,578 @@ BEGIN
     FROM Users.Notification
     WHERE UserID = @UserID
       AND (@UnreadOnly = 0 OR IsRead = 0)
+      AND (@Type IS NULL OR [Type] = @Type)
     ORDER BY CreatedAt DESC
     OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY;
 
     SELECT COUNT(*) AS Total
     FROM Users.Notification
     WHERE UserID = @UserID
-      AND (@UnreadOnly = 0 OR IsRead = 0);
+      AND (@UnreadOnly = 0 OR IsRead = 0)
+      AND (@Type IS NULL OR [Type] = @Type);
 END;
 GO
 
 -- ============================================================
--- sp_MarkNotificationRead (NEW)
+-- sp_MarkNotificationRead (UPDATED: added @UserID filter, returns record)
 -- ============================================================
 CREATE OR ALTER PROCEDURE Users.sp_MarkNotificationRead
-    @NotificationID INT
+    @NotificationID INT,
+    @UserID         INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
 
     UPDATE Users.Notification SET IsRead = 1
-    WHERE NotificationID = @NotificationID;
+    WHERE NotificationID = @NotificationID
+      AND (@UserID IS NULL OR UserID = @UserID);
+
+    SELECT * FROM Users.Notification WHERE NotificationID = @NotificationID;
 END;
 GO
 
-PRINT N'16 stored procedures created.';
+-- ============================================================================
+-- NEW STORED PROCEDURES: Auth, Dashboard, Wallet, Sessions, Events, PDF
+-- ============================================================================
+
+-- ============================================================
+-- Users.sp_RegisterUser (with auto wallet creation)
+-- ============================================================
+CREATE OR ALTER PROCEDURE Users.sp_RegisterUser
+    @Username       NVARCHAR(50),
+    @Email          NVARCHAR(200),
+    @Phone          NVARCHAR(20) = NULL,
+    @PasswordHash   NVARCHAR(500),
+    @FullName       NVARCHAR(200),
+    @Role           NVARCHAR(20) = 'Customer'
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @TranCount INT = @@TRANCOUNT;
+
+    BEGIN TRY
+        IF @TranCount = 0 BEGIN TRANSACTION;
+
+        IF EXISTS (SELECT 1 FROM Users.[User] WHERE Email = @Email OR Username = @Username)
+            THROW 50060, N'Tên đăng nhập hoặc email đã tồn tại.', 1;
+
+        INSERT INTO Users.[User] (Username, Email, Phone, PasswordHash, FullName, Role, AccountStatus, CreatedAt)
+        VALUES (@Username, @Email, @Phone, @PasswordHash, @FullName, @Role, 'Active', SYSDATETIME());
+
+        DECLARE @UserID INT = SCOPE_IDENTITY();
+
+        INSERT INTO Payments.Wallet (UserID, WalletCode, Balance, CreatedAt)
+        VALUES (@UserID, 'WAL-' + @Username, 0, SYSDATETIME());
+
+        IF @TranCount = 0 COMMIT TRANSACTION;
+
+        SELECT UserID, Username, Email, Role FROM Users.[User] WHERE UserID = @UserID;
+    END TRY
+    BEGIN CATCH
+        IF @TranCount = 0 AND @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+-- ============================================================
+-- Users.sp_GetUserByLogin
+-- ============================================================
+CREATE OR ALTER PROCEDURE Users.sp_GetUserByLogin
+    @Login NVARCHAR(200)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT * FROM Users.[User] WHERE (Email = @Login OR Username = @Login);
+END;
+GO
+
+-- ============================================================
+-- Users.sp_UpdateFailedLoginAttempts
+-- ============================================================
+CREATE OR ALTER PROCEDURE Users.sp_UpdateFailedLoginAttempts
+    @UserID  INT,
+    @Attempts INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Users.[User] SET FailedLoginAttempts = @Attempts WHERE UserID = @UserID;
+    IF @Attempts >= 5
+        UPDATE Users.[User] SET LockoutEnd = DATEADD(HOUR, 1, SYSDATETIME()) WHERE UserID = @UserID;
+END;
+GO
+
+-- ============================================================
+-- Users.sp_ResetLoginSuccess
+-- ============================================================
+CREATE OR ALTER PROCEDURE Users.sp_ResetLoginSuccess
+    @UserID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Users.[User] SET FailedLoginAttempts = 0, LastLoginAt = SYSDATETIME() WHERE UserID = @UserID;
+END;
+GO
+
+-- ============================================================
+-- Users.sp_GetUserProfile
+-- ============================================================
+CREATE OR ALTER PROCEDURE Users.sp_GetUserProfile
+    @UserID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT UserID, Username, Email, Phone, FullName, AvatarUrl, Role,
+           FranchiseID, AccountStatus, LastLoginAt, CreatedAt
+    FROM Users.[User] WHERE UserID = @UserID;
+END;
+GO
+
+-- ============================================================
+-- Users.sp_UpdateUserProfile
+-- ============================================================
+CREATE OR ALTER PROCEDURE Users.sp_UpdateUserProfile
+    @UserID   INT,
+    @FullName NVARCHAR(200) = NULL,
+    @AvatarUrl NVARCHAR(500) = NULL,
+    @Phone    NVARCHAR(20) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Users.[User] SET
+        FullName  = ISNULL(@FullName, FullName),
+        AvatarUrl = ISNULL(@AvatarUrl, AvatarUrl),
+        Phone     = ISNULL(@Phone, Phone),
+        UpdatedAt = SYSDATETIME()
+    WHERE UserID = @UserID;
+
+    SELECT UserID, Username, Email, Phone, FullName, AvatarUrl, Role,
+           FranchiseID, AccountStatus, LastLoginAt, CreatedAt
+    FROM Users.[User] WHERE UserID = @UserID;
+END;
+GO
+
+-- ============================================================
+-- Users.sp_CheckEmailExists
+-- ============================================================
+CREATE OR ALTER PROCEDURE Users.sp_CheckEmailExists
+    @Email NVARCHAR(200)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT UserID, Email FROM Users.[User] WHERE Email = @Email;
+END;
+GO
+
+-- ============================================================
+-- Users.sp_UpdatePassword
+-- ============================================================
+CREATE OR ALTER PROCEDURE Users.sp_UpdatePassword
+    @UserID      INT,
+    @PasswordHash NVARCHAR(500)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE Users.[User] SET PasswordHash = @PasswordHash, UpdatedAt = SYSDATETIME() WHERE UserID = @UserID;
+END;
+GO
+
+-- ============================================================
+-- Operations.sp_CancelChargingSession (self-contained transaction)
+-- ============================================================
+CREATE OR ALTER PROCEDURE Operations.sp_CancelChargingSession
+    @SessionID BIGINT,
+    @StopReason NVARCHAR(50) = 'CancelledByUser'
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @TranCount INT = @@TRANCOUNT;
+
+    BEGIN TRY
+        IF @TranCount = 0 BEGIN TRANSACTION;
+
+        DECLARE @CurrentStatus NVARCHAR(20), @PointID INT, @UserID INT, @StationID INT;
+        SELECT @CurrentStatus = SessionStatus, @PointID = PointID, @UserID = UserID, @StationID = StationID
+        FROM Operations.ChargingSession WHERE SessionID = @SessionID;
+
+        IF @CurrentStatus IS NULL
+            EXEC dbo.sp_ThrowError 50010;
+        IF @CurrentStatus NOT IN ('Charging', 'Pending')
+            EXEC dbo.sp_ThrowError 50011;
+
+        UPDATE Operations.ChargingSession SET
+            SessionStatus = 'Cancelled', StopReason = @StopReason, UpdatedAt = SYSDATETIME()
+        WHERE SessionID = @SessionID;
+
+        UPDATE Infrastructure.ChargingPoint SET PointStatus = 'Available', UpdatedAt = SYSDATETIME()
+        WHERE PointID = @PointID;
+
+        IF @TranCount = 0 COMMIT TRANSACTION;
+
+        SELECT SessionID, PointID, StationID, UserID FROM Operations.ChargingSession WHERE SessionID = @SessionID;
+    END TRY
+    BEGIN CATCH
+        IF @TranCount = 0 AND @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+-- ============================================================
+-- Operations.sp_GetActiveSessions (dynamic filter SP)
+-- ============================================================
+CREATE OR ALTER PROCEDURE Operations.sp_GetActiveSessions
+    @Status     NVARCHAR(20) = NULL,
+    @UserID     INT = NULL,
+    @StationID  INT = NULL,
+    @FromDate   DATETIME2 = NULL,
+    @ToDate     DATETIME2 = NULL,
+    @Page       INT = 1,
+    @Limit      INT = 20
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @Offset INT = (@Page - 1) * @Limit;
+
+    SELECT cs.*, u.Username, u.FullName, s.StationCode, s.StationName, p.PointCode, v.PlateNumber
+    FROM Operations.ChargingSession cs
+    JOIN Users.[User] u ON cs.UserID = u.UserID
+    JOIN Infrastructure.ChargingStation s ON cs.StationID = s.StationID
+    JOIN Infrastructure.ChargingPoint p ON cs.PointID = p.PointID
+    LEFT JOIN Users.Vehicle v ON cs.VehicleID = v.VehicleID
+    WHERE (@Status IS NULL OR cs.SessionStatus = @Status)
+      AND (@UserID IS NULL OR cs.UserID = @UserID)
+      AND (@StationID IS NULL OR cs.StationID = @StationID)
+      AND (@FromDate IS NULL OR cs.StartTime >= @FromDate)
+      AND (@ToDate IS NULL OR cs.StartTime <= @ToDate)
+    ORDER BY cs.StartTime DESC
+    OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY;
+END;
+GO
+
+-- ============================================================
+-- Operations.sp_GetSessionById (join query)
+-- ============================================================
+CREATE OR ALTER PROCEDURE Operations.sp_GetSessionById
+    @SessionID BIGINT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT cs.*, u.Username, u.FullName, s.StationName, p.PointCode, v.PlateNumber
+    FROM Operations.ChargingSession cs
+    JOIN Users.[User] u ON cs.UserID = u.UserID
+    JOIN Infrastructure.ChargingStation s ON cs.StationID = s.StationID
+    JOIN Infrastructure.ChargingPoint p ON cs.PointID = p.PointID
+    LEFT JOIN Users.Vehicle v ON cs.VehicleID = v.VehicleID
+    WHERE cs.SessionID = @SessionID;
+END;
+GO
+
+-- ============================================================
+-- Infrastructure.sp_GetStationIdByPoint
+-- ============================================================
+CREATE OR ALTER PROCEDURE Infrastructure.sp_GetStationIdByPoint
+    @PointID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT StationID FROM Infrastructure.ChargingPoint WHERE PointID = @PointID;
+END;
+GO
+
+-- ============================================================
+-- Payments.sp_GetOrCreateWallet
+-- ============================================================
+CREATE OR ALTER PROCEDURE Payments.sp_GetOrCreateWallet
+    @UserID INT,
+    @Username NVARCHAR(50) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @WalletID INT;
+    SELECT @WalletID = WalletID FROM Payments.Wallet WHERE UserID = @UserID AND IsActive = 1;
+
+    IF @WalletID IS NULL
+    BEGIN
+        IF @Username IS NULL
+            SELECT @Username = Username FROM Users.[User] WHERE UserID = @UserID;
+        SET @Username = ISNULL(@Username, CAST(@UserID AS NVARCHAR(10)));
+
+        INSERT INTO Payments.Wallet (UserID, WalletCode, Balance, CreatedAt)
+        VALUES (@UserID, 'WAL-' + @Username, 0, SYSDATETIME());
+
+        SET @WalletID = SCOPE_IDENTITY();
+    END;
+
+    SELECT * FROM Payments.Wallet WHERE WalletID = @WalletID;
+END;
+GO
+
+-- ============================================================
+-- Payments.sp_TopUpWallet (self-contained transaction)
+-- ============================================================
+CREATE OR ALTER PROCEDURE Payments.sp_TopUpWallet
+    @UserID        INT,
+    @Amount        MONEY,
+    @PaymentMethod NVARCHAR(30) = 'BankTransfer'
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @TranCount INT = @@TRANCOUNT;
+
+    BEGIN TRY
+        IF @TranCount = 0 BEGIN TRANSACTION;
+
+        DECLARE @WalletID INT, @Balance MONEY;
+        SELECT @WalletID = WalletID, @Balance = Balance
+        FROM Payments.Wallet WHERE UserID = @UserID AND IsActive = 1;
+
+        IF @WalletID IS NULL
+            EXEC dbo.sp_ThrowError 50025;
+
+        DECLARE @TxnCode NVARCHAR(30) = 'TXN-' + FORMAT(SYSDATETIME(), 'yyyyMMdd') + '-' + LEFT(CAST(NEWID() AS NVARCHAR(36)), 6);
+
+        DECLARE @TxnID BIGINT;
+        INSERT INTO Payments.[Transaction] (TransactionCode, UserID, TransactionType, Direction, Amount, CurrencyCode, TransactionStatus, PaymentMethod, TransactedAt, CreatedAt)
+        VALUES (@TxnCode, @UserID, 'WalletTopUp', 'C', @Amount, 'VND', 'Completed', @PaymentMethod, SYSDATETIME(), SYSDATETIME());
+
+        SET @TxnID = SCOPE_IDENTITY();
+
+        UPDATE Payments.Wallet SET Balance = Balance + @Amount, LastTransactionAt = SYSDATETIME()
+        WHERE WalletID = @WalletID;
+
+        INSERT INTO Payments.WalletTransaction (WalletID, TransactionID, Amount, BalanceBefore, Direction, TransactionType, CreatedAt)
+        VALUES (@WalletID, @TxnID, @Amount, @Balance, 'C', 'WalletTopUp', SYSDATETIME());
+
+        SET @Balance = @Balance + @Amount;
+
+        IF @TranCount = 0 COMMIT TRANSACTION;
+
+        SELECT @TxnID AS TransactionID, @Balance AS NewBalance;
+    END TRY
+    BEGIN CATCH
+        IF @TranCount = 0 AND @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+-- ============================================================
+-- Payments.sp_GetTransactionHistory (dynamic filter SP)
+-- ============================================================
+CREATE OR ALTER PROCEDURE Payments.sp_GetTransactionHistory
+    @UserID INT = NULL,
+    @Status NVARCHAR(20) = NULL,
+    @Type   NVARCHAR(30) = NULL,
+    @Page   INT = 1,
+    @Limit  INT = 20
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @Offset INT = (@Page - 1) * @Limit;
+
+    SELECT t.*, cs.SessionCode
+    FROM Payments.[Transaction] t
+    LEFT JOIN Operations.ChargingSession cs ON t.SessionID = cs.SessionID
+    WHERE (@UserID IS NULL OR t.UserID = @UserID)
+      AND (@Status IS NULL OR t.TransactionStatus = @Status)
+      AND (@Type IS NULL OR t.TransactionType = @Type)
+    ORDER BY t.TransactedAt DESC
+    OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY;
+END;
+GO
+
+-- ============================================================
+-- Reporting.sp_GetAdminDashboard (multi-result-set SP)
+-- ============================================================
+CREATE OR ALTER PROCEDURE Reporting.sp_GetAdminDashboard
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT * FROM Reporting.vw_RevenueTrend ORDER BY Date DESC;
+
+    SELECT
+        (SELECT COUNT(*) FROM Users.[User] WHERE AccountStatus = 'Active') AS TotalUsers,
+        (SELECT COUNT(*) FROM Infrastructure.ChargingStation WHERE IsActive = 1) AS TotalStations,
+        (SELECT COUNT(*) FROM Infrastructure.Franchise WHERE IsActive = 1) AS TotalFranchises,
+        (SELECT COUNT(*) FROM Operations.ChargingSession WHERE SessionStatus = 'Completed') AS TotalSessions,
+        (SELECT COUNT(*) FROM Operations.ChargingSession WHERE SessionStatus = 'Charging') AS ActiveSessions,
+        (SELECT ISNULL(SUM(TotalKWh), 0) FROM Operations.ChargingSession WHERE SessionStatus = 'Completed') AS TotalKWh,
+        (SELECT ISNULL(SUM(CostTotal), 0) FROM Operations.ChargingSession WHERE SessionStatus = 'Completed') AS TotalRevenue,
+        (SELECT COUNT(*) FROM Operations.Booking WHERE Status IN ('Pending', 'Confirmed')) AS PendingBookings,
+        (SELECT COUNT(*) FROM Infrastructure.ErrorLog WHERE IsActive = 1 AND ResolvedAt IS NULL) AS UnresolvedErrors,
+        (SELECT COUNT(*) FROM Operations.MaintenanceSchedule WHERE Status IN ('Scheduled', 'InProgress')) AS UpcomingMaintenance,
+        (SELECT COUNT(*) FROM Users.Notification WHERE IsRead = 0) AS UnreadNotifications;
+
+    SELECT TOP 10 s.StationCode, s.StationName,
+        COUNT(cs.SessionID) AS Sessions,
+        ISNULL(SUM(cs.TotalKWh), 0) AS KWh,
+        ISNULL(SUM(cs.CostTotal), 0) AS Revenue
+    FROM Operations.ChargingSession cs
+    JOIN Infrastructure.ChargingStation s ON cs.StationID = s.StationID
+    WHERE cs.SessionStatus = 'Completed'
+    GROUP BY s.StationCode, s.StationName
+    ORDER BY Revenue DESC;
+
+    SELECT TOP 5 b.*, s.StationName, p.PointCode
+    FROM Operations.Booking b
+    JOIN Infrastructure.ChargingStation s ON b.StationID = s.StationID
+    LEFT JOIN Infrastructure.ChargingPoint p ON b.PointID = p.PointID
+    ORDER BY b.CreatedAt DESC;
+
+    SELECT TOP 5 el.*, p.PointCode
+    FROM Infrastructure.ErrorLog el
+    LEFT JOIN Infrastructure.ChargingPoint p ON el.PointID = p.PointID
+    WHERE el.IsActive = 1 AND el.ResolvedAt IS NULL
+    ORDER BY el.OccurredAt DESC;
+END;
+GO
+
+-- ============================================================
+-- Reporting.sp_GetStationDashboard
+-- ============================================================
+CREATE OR ALTER PROCEDURE Reporting.sp_GetStationDashboard
+    @StationID INT,
+    @Days      INT = 30
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT COUNT(*) AS ActiveSessions
+    FROM Operations.ChargingSession
+    WHERE StationID = @StationID AND SessionStatus = 'Charging';
+
+    SELECT
+        COUNT(*) AS TotalSessions,
+        ISNULL(SUM(TotalKWh), 0) AS TotalKWh,
+        ISNULL(SUM(CostTotal), 0) AS TotalRevenue,
+        ISNULL(AVG(ChargingDurationMinutes), 0) AS AvgDuration
+    FROM Operations.ChargingSession
+    WHERE StationID = @StationID AND SessionStatus = 'Completed'
+      AND StartTime >= DATEADD(DAY, -@Days, SYSDATETIME());
+
+    SELECT PointStatus, COUNT(*) AS Count
+    FROM Infrastructure.ChargingPoint
+    WHERE StationID = @StationID AND IsActive = 1
+    GROUP BY PointStatus;
+
+    SELECT * FROM Infrastructure.ChargingStation WHERE StationID = @StationID;
+END;
+GO
+
+-- ============================================================
+-- Reporting.sp_GetFranchiseDashboard
+-- ============================================================
+CREATE OR ALTER PROCEDURE Reporting.sp_GetFranchiseDashboard
+    @FranchiseID INT,
+    @Days        INT = 30
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT StationID, StationCode, StationName, StationStatus
+    FROM Infrastructure.ChargingStation
+    WHERE FranchiseID = @FranchiseID AND IsActive = 1;
+
+    SELECT
+        ISNULL(SUM(CostTotal), 0) AS TotalRevenue,
+        ISNULL(SUM(TotalKWh), 0) AS TotalKWh,
+        COUNT(*) AS TotalSessions
+    FROM Operations.ChargingSession
+    WHERE StationID IN (
+        SELECT StationID FROM Infrastructure.ChargingStation WHERE FranchiseID = @FranchiseID AND IsActive = 1
+    ) AND SessionStatus = 'Completed'
+      AND StartTime >= DATEADD(DAY, -@Days, SYSDATETIME());
+
+    SELECT * FROM Infrastructure.Franchise WHERE FranchiseID = @FranchiseID;
+END;
+GO
+
+-- ============================================================
+-- Reporting.sp_GetFranchiseReportData (for PDF)
+-- ============================================================
+CREATE OR ALTER PROCEDURE Reporting.sp_GetFranchiseReportData
+    @FranchiseID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT * FROM Infrastructure.Franchise WHERE FranchiseID = @FranchiseID;
+
+    SELECT StationID, StationCode, StationName, StationStatus
+    FROM Infrastructure.ChargingStation WHERE FranchiseID = @FranchiseID AND IsActive = 1;
+
+    SELECT
+        ISNULL(SUM(CostTotal), 0) AS TotalRevenue,
+        ISNULL(SUM(TotalKWh), 0) AS TotalKWh,
+        COUNT(*) AS TotalSessions
+    FROM Operations.ChargingSession
+    WHERE StationID IN (
+        SELECT StationID FROM Infrastructure.ChargingStation WHERE FranchiseID = @FranchiseID AND IsActive = 1
+    ) AND SessionStatus = 'Completed';
+END;
+GO
+
+-- ============================================================
+-- dbo.sp_EmitRealtimeEvent
+-- ============================================================
+CREATE OR ALTER PROCEDURE dbo.sp_EmitRealtimeEvent
+    @EventType      NVARCHAR(100),
+    @Payload        NVARCHAR(MAX) = NULL,
+    @UserID         INT = NULL,
+    @AggregateType  NVARCHAR(50) = NULL,
+    @AggregateID    NVARCHAR(50) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO dbo.RealtimeEvent (EventType, AggregateType, AggregateID, Payload, UserID, CreatedAt)
+    VALUES (@EventType, @AggregateType, @AggregateID, @Payload, @UserID, SYSDATETIME());
+END;
+GO
+
+-- ============================================================
+-- dbo.sp_GetMissedEvents
+-- ============================================================
+CREATE OR ALTER PROCEDURE dbo.sp_GetMissedEvents
+    @UserID INT,
+    @Since  DATETIME2
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT EventType, Payload, CreatedAt
+    FROM dbo.RealtimeEvent
+    WHERE (UserID = @UserID OR UserID IS NULL)
+      AND CreatedAt > @Since
+    ORDER BY CreatedAt;
+END;
+GO
+
+-- ============================================================
+-- Operations.sp_CheckBookingAvailability (returns result set)
+-- ============================================================
+CREATE OR ALTER PROCEDURE Operations.sp_CheckBookingAvailability
+    @PointID  INT,
+    @FromTime DATETIME2,
+    @ToTime   DATETIME2
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @PointStatus NVARCHAR(20), @Cnt INT, @IsAvailable BIT;
+    SELECT @PointStatus = PointStatus FROM Infrastructure.ChargingPoint WHERE PointID = @PointID;
+    SELECT @Cnt = COUNT(*) FROM Operations.Booking
+        WHERE PointID = @PointID AND Status IN ('Pending', 'Confirmed')
+        AND BookedFrom < @ToTime AND BookedTo > @FromTime;
+    SET @IsAvailable = CASE WHEN @PointStatus = 'Available' AND @Cnt = 0 THEN 1 ELSE 0 END;
+    SELECT @IsAvailable AS IsAvailable, ISNULL(@Cnt, 0) AS ConflictingBookings;
+END;
+GO
+
+-- ============================================================================
+-- END NEW STORED PROCEDURES
+-- ============================================================================
+
+PRINT N'Additional stored procedures created (Auth, Dashboard, Wallet, Sessions, Events, PDF).';
 GO

@@ -145,5 +145,27 @@ BEGIN
 END;
 GO
 
-PRINT N'3 batch job stored procedures created.';
+-- ============================================================
+-- sp_RecordHourlySnapshot: Wrapper for analytics snapshot
+-- ============================================================
+CREATE OR ALTER PROCEDURE Reporting.sp_RecordHourlySnapshot
+AS
+BEGIN
+    SET NOCOUNT ON;
+    EXEC Reporting.sp_TakeHourlySnapshot;
+END;
+GO
+
+-- ============================================================
+-- sp_RecordDailySnapshot: Wrapper for daily analytics snapshot
+-- ============================================================
+CREATE OR ALTER PROCEDURE Reporting.sp_RecordDailySnapshot
+AS
+BEGIN
+    SET NOCOUNT ON;
+    EXEC Reporting.sp_TakeDailySnapshot;
+END;
+GO
+
+PRINT N'5 batch job stored procedures created.';
 GO

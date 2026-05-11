@@ -1,5 +1,7 @@
-const { query, execute } = require('../config/database');
+const { execute } = require('../config/database');
 const { NotFoundError, ValidationError, successResponse } = require('../utils/response');
+const socketService = require('./socketService');
+const notificationService = require('./NotificationService');
 
 class ChargingSessionService {
   async startSession({ UserID, VehicleID, PointID, StartBatteryPercent, MeterStart }) {
@@ -7,7 +9,18 @@ class ChargingSessionService {
       UserID, VehicleID: VehicleID || null, PointID,
       StartBatteryPercent: StartBatteryPercent || null, MeterStart: MeterStart || null,
     });
-    return successResponse(result.recordset[0], 'Charging session started');
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new Error('Charging session start returned no result');
+    }
+    const session = result.recordset[0];
+    const stationResult = await execute('Infrastructure.sp_GetStationIdByPoint', { PointID });
+    const stationId = stationResult.recordset[0]?.StationID;
+    if (stationId) {
+      socketService.sendToStation(stationId, 'session:started', session);
+    }
+    socketService.sendToUser(UserID, 'session:started', session);
+    socketService.sendToRole('Manager', 'session:started', session);
+    return successResponse(session, 'Charging session started');
   }
 
   async endSession(sessionId, { EndBatteryPercent, MeterEnd, TotalKWh, StopReason }) {
@@ -16,52 +29,52 @@ class ChargingSessionService {
       MeterEnd: MeterEnd || null, TotalKWh: TotalKWh || null,
       StopReason: StopReason || 'Completed',
     });
-    return successResponse(result.recordset[0], 'Charging session completed');
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new NotFoundError('ChargingSession');
+    }
+    const session = result.recordset[0];
+    socketService.sendToStation(session.StationID, 'session:ended', session);
+    socketService.sendToUser(session.UserID, 'session:ended', session);
+    socketService.sendToRole('Manager', 'session:ended', session);
+    return successResponse(session, 'Charging session completed');
   }
 
   async cancelSession(sessionId, reason) {
-    const session = await query(`SELECT * FROM [Operations].[ChargingSession] WHERE SessionID = @SessionID`,
-      { SessionID: sessionId });
-    if (session.recordset.length === 0) throw new NotFoundError('ChargingSession');
-    const s = session.recordset[0];
-    if (!['Charging', 'Pending'].includes(s.SessionStatus)) {
-      throw new ValidationError(`Cannot cancel session with status ${s.SessionStatus}`);
+    const result = await execute('Operations.sp_CancelChargingSession', {
+      SessionID: sessionId, StopReason: reason || 'CancelledByUser',
+    });
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new NotFoundError('ChargingSession');
     }
+    const s = result.recordset[0];
 
-    await query(`UPDATE [Operations].[ChargingSession] SET SessionStatus = 'Cancelled', StopReason = @Reason, UpdatedAt = SYSDATETIME() WHERE SessionID = @SessionID`,
-      { SessionID: sessionId, Reason: reason || 'CancelledByUser' });
-    await query(`UPDATE [Infrastructure].[ChargingPoint] SET PointStatus = 'Available', UpdatedAt = SYSDATETIME() WHERE PointID = @PointID`,
-      { PointID: s.PointID });
+    try {
+      socketService.sendToStation(s.StationID, 'session:cancelled', { SessionID: sessionId, PointID: s.PointID });
+      socketService.sendToUser(s.UserID, 'session:cancelled', { SessionID: sessionId });
+      await notificationService.create(s.UserID, {
+        Title: 'Phiên sạc đã hủy',
+        Body: `Phiên sạc tại điểm #${s.PointID} đã bị hủy.`,
+        Type: 'Warning',
+        ReferenceType: 'Session',
+        ReferenceID: sessionId,
+      });
+    } catch (notifyErr) {
+      console.error('Post-commit notification failed:', notifyErr.message);
+    }
 
     return successResponse(null, 'Charging session cancelled');
   }
 
   async getActiveSessions(filters = {}) {
-    let q = `SELECT cs.*, u.Username, u.FullName, s.StationCode, s.StationName, p.PointCode, v.PlateNumber
-      FROM [Operations].[ChargingSession] cs
-      JOIN [Users].[User] u ON cs.UserID = u.UserID
-      JOIN [Infrastructure].[ChargingStation] s ON cs.StationID = s.StationID
-      JOIN [Infrastructure].[ChargingPoint] p ON cs.PointID = p.PointID
-      LEFT JOIN [Users].[Vehicle] v ON cs.VehicleID = v.VehicleID
-      WHERE 1=1`;
-    const params = {};
+    const params = { Page: filters.page || 1, Limit: filters.limit || 50 };
+    if (filters.status) params.Status = filters.status;
+    if (filters.userId) params.UserID = filters.userId;
+    if (filters.stationId) params.StationID = filters.stationId;
+    if (filters.fromDate) params.FromDate = filters.fromDate;
+    if (filters.toDate) params.ToDate = filters.toDate;
 
-    if (filters.status) { q += ` AND cs.SessionStatus = @Status`; params.Status = filters.status; }
-    if (filters.userId) { q += ` AND cs.UserID = @UserID`; params.UserID = filters.userId; }
-    if (filters.stationId) { q += ` AND cs.StationID = @StationID`; params.StationID = filters.stationId; }
-    if (filters.fromDate) { q += ` AND cs.StartTime >= @FromDate`; params.FromDate = filters.fromDate; }
-    if (filters.toDate) { q += ` AND cs.StartTime <= @ToDate`; params.ToDate = filters.toDate; }
-
-    q += ` ORDER BY cs.StartTime DESC`;
-    if (filters.page && filters.limit) {
-      const offset = (filters.page - 1) * filters.limit;
-      q += ` OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY`;
-      params.Offset = offset;
-      params.Limit = filters.limit;
-    }
-
-    const result = await query(q, params);
-    return result.recordset;
+    const result = await execute('Operations.sp_GetActiveSessions', params);
+    return result.recordset || [];
   }
 
   async getSessionHistory(userId) {

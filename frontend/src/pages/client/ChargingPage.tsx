@@ -1,54 +1,62 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Zap, XCircle, Loader2, Battery, Clock, DollarSign } from 'lucide-react';
 import { motion } from 'motion/react';
 import { api } from '../../services/api';
+import { useSocketEvent } from '../../lib/useSocket';
+import { useMySessions, useStations, usePoints } from '../../lib/useApi';
+import { queryKeys } from '../../lib/queryKeys';
 import PageHeader from '../../components/ui/PageHeader';
 import StatusBadge from '../../components/ui/StatusBadge';
-import type { ChargingSession, ChargingStation, ChargingPoint } from '../../types';
+import type { ChargingSession } from '../../types';
 
 export default function ChargingPage() {
-  const [active, setActive] = useState<ChargingSession[]>([]);
-  const [stations, setStations] = useState<ChargingStation[]>([]);
-  const [points, setPoints] = useState<ChargingPoint[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
+  const { data: sessions = [], isLoading: sessionsLoading } = useMySessions();
+  const { data: stations = [], isLoading: stationsLoading } = useStations();
+  const { data: points = [], isLoading: pointsLoading } = usePoints();
   const [selectedStation, setSelectedStation] = useState<number | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
   const [error, setError] = useState('');
 
-  const load = () => {
-    setLoading(true);
-    Promise.all([
-      api.get('/sessions/my').catch(() => ({ data: [] })),
-      api.get('/stations').catch(() => ({ data: [] })),
-      api.get('/points').catch(() => ({ data: [] })),
-    ]).then(([sRes, stRes, pRes]) => {
-      setActive(Array.isArray(sRes.data) ? sRes.data.filter((s: ChargingSession) => s.SessionStatus === 'Charging') : []);
-      setStations(Array.isArray(stRes.data) ? stRes.data : []);
-      setPoints(Array.isArray(pRes.data) ? pRes.data : []);
-    }).finally(() => setLoading(false));
-  };
+  const active = sessions.filter(s => s.SessionStatus === 'Charging');
 
-  useEffect(() => { load(); }, []);
+  useSocketEvent('session:started', () => {
+    qc.invalidateQueries({ queryKey: queryKeys.sessions.my });
+    qc.invalidateQueries({ queryKey: queryKeys.stations.points() });
+  });
+
+  useSocketEvent('session:ended', () => {
+    qc.invalidateQueries({ queryKey: queryKeys.sessions.my });
+    qc.invalidateQueries({ queryKey: queryKeys.stations.points() });
+  });
+
+  useSocketEvent('session:cancelled', (data: any) => {
+    qc.invalidateQueries({ queryKey: queryKeys.sessions.my });
+    qc.invalidateQueries({ queryKey: queryKeys.stations.points() });
+  });
 
   const handleStart = async () => {
     if (!selectedPoint) return;
     setError('');
     try {
-      const res = await api.post('/sessions/start', { PointID: selectedPoint });
+      await api.post('/sessions/start', { PointID: selectedPoint });
       setSelectedStation(null);
       setSelectedPoint(null);
-      load();
+      qc.invalidateQueries({ queryKey: queryKeys.sessions.my });
+      qc.invalidateQueries({ queryKey: queryKeys.stations.points() });
     } catch (err: any) { setError(err.message); }
   };
 
   const handleStop = async (sessionId: number) => {
     try {
       await api.post(`/sessions/${sessionId}/end`, { StopReason: 'UserStopped' });
-      load();
+      qc.invalidateQueries({ queryKey: queryKeys.sessions.my });
+      qc.invalidateQueries({ queryKey: queryKeys.stations.points() });
     } catch (err: any) { setError(err.message); }
   };
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+  if (sessionsLoading || stationsLoading || pointsLoading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
 
   const availablePoints = points.filter(p =>
     p.PointStatus === 'Available' &&

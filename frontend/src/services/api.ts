@@ -46,6 +46,12 @@ async function request<T = any>(
     body: body ? JSON.stringify(body) : undefined,
   });
 
+  const data = await res.json().catch(() => ({}));
+
+  if (res.status === 403) {
+    throw new ApiError(403, data?.message || 'Access denied');
+  }
+
   if (res.status === 401 && !isRetry) {
     const refreshToken = localStorage.getItem('refreshToken');
     if (refreshToken && !isRefreshing) {
@@ -75,15 +81,24 @@ async function request<T = any>(
     throw new ApiError(401, 'Unauthorized');
   }
 
-  const data = await res.json();
   if (!res.ok) {
     throw new ApiError(res.status, data?.message || 'Request failed');
   }
   return data;
 }
 
+function buildQueryString(path: string, params?: Record<string, any>): string {
+  if (!params) return path;
+  const search = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== '') search.set(k, String(v));
+  }
+  const qs = search.toString();
+  return qs ? `${path}?${qs}` : path;
+}
+
 export const api = {
-  get: <T = any>(path: string) => request<T>('GET', path),
+  get: <T = any>(path: string, params?: Record<string, any>) => request<T>('GET', buildQueryString(path, params)),
   post: <T = any>(path: string, body?: any) => request<T>('POST', path, body),
   put: <T = any>(path: string, body?: any) => request<T>('PUT', path, body),
   delete: <T = any>(path: string) => request<T>('DELETE', path),

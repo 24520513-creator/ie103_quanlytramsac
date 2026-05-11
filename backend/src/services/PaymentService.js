@@ -1,72 +1,66 @@
-const { query, execute } = require('../config/database');
+const { execute } = require('../config/database');
 const { NotFoundError, ValidationError, successResponse } = require('../utils/response');
 const { Transaction, Wallet } = require('../models/Payments');
+const socketService = require('./socketService');
+const notificationService = require('./NotificationService');
 
 class PaymentService {
   async createPayment({ UserID, SessionID, PaymentMethod }) {
     const result = await execute('Payments.sp_CreatePayment', {
       UserID, SessionID, PaymentMethod: PaymentMethod || 'Wallet',
     });
-    return successResponse(new Transaction(result.recordset[0]), 'Payment processed successfully');
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new Error('Payment processing returned no result');
+    }
+    const payment = new Transaction(result.recordset[0]);
+    socketService.sendToUser(UserID, 'payment:created', payment);
+    return successResponse(payment, 'Payment processed successfully');
   }
 
   async getUserWallet(userId) {
-    let wallet = await query(`SELECT * FROM [Payments].[Wallet] WHERE UserID = @UserID AND IsActive = 1`,
-      { UserID: userId });
-    if (wallet.recordset.length === 0) {
-      const user = await query(`SELECT Username FROM [Users].[User] WHERE UserID = @UserID`, { UserID: userId });
-      const walletCode = 'WAL-' + (user.recordset[0]?.Username || userId);
-      await query(`INSERT INTO [Payments].[Wallet] (UserID, WalletCode, Balance, CreatedAt)
-        VALUES (@UserID, @Code, 0, SYSDATETIME())`, { UserID: userId, Code: walletCode });
-      wallet = await query(`SELECT * FROM [Payments].[Wallet] WHERE UserID = @UserID`, { UserID: userId });
+    const result = await execute('Payments.sp_GetOrCreateWallet', { UserID: userId });
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new NotFoundError('Wallet');
     }
-    return successResponse(new Wallet(wallet.recordset[0]));
+    return successResponse(new Wallet(result.recordset[0]));
   }
 
   async topUpWallet(userId, amount, paymentMethod) {
-    if (amount <= 0) throw new ValidationError('Amount must be positive');
-    const wallet = await query(`SELECT * FROM [Payments].[Wallet] WHERE UserID = @UserID AND IsActive = 1`,
-      { UserID: userId });
-    if (wallet.recordset.length === 0) throw new NotFoundError('Wallet');
+    if (!amount || amount <= 0) throw new ValidationError('Amount must be positive');
 
-    const txnCode = `TXN-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Date.now().toString(36).toUpperCase()}`;
-    const txnResult = await query(`INSERT INTO [Payments].[Transaction]
-      (TransactionCode, UserID, TransactionType, Direction, Amount, CurrencyCode, TransactionStatus, PaymentMethod, TransactedAt, CreatedAt)
-      OUTPUT INSERTED.*
-      VALUES (@Code, @UserID, 'WalletTopUp', 'C', @Amount, 'VND', 'Completed', @PayMethod, SYSDATETIME(), SYSDATETIME())`, {
-      Code: txnCode, UserID: userId, Amount: amount, PayMethod: paymentMethod || 'BankTransfer',
+    const result = await execute('Payments.sp_TopUpWallet', {
+      UserID: userId, Amount: amount, PaymentMethod: paymentMethod || 'BankTransfer',
     });
-    const txn = txnResult.recordset[0];
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new Error('Top-up returned no result');
+    }
+    const { TransactionID, NewBalance } = result.recordset[0];
 
-    const w = wallet.recordset[0];
-    await query(`UPDATE [Payments].[Wallet] SET Balance = Balance + @Amount, LastTransactionAt = SYSDATETIME() WHERE WalletID = @WalletID`,
-      { Amount: amount, WalletID: w.WalletID });
+    try {
+      socketService.sendToUser(userId, 'wallet:updated', { Balance: NewBalance });
+      const txn = { TransactionID, Amount: amount };
+      socketService.sendToUser(userId, 'transaction:new', txn);
+      await notificationService.create(userId, {
+        Title: 'Nạp tiền thành công',
+        Body: `Ví của bạn đã được nạp ${amount.toLocaleString()} VND. Số dư mới: ${NewBalance.toLocaleString()} VND.`,
+        Type: 'Success',
+        ReferenceType: 'Transaction',
+        ReferenceID: TransactionID,
+      });
+    } catch (notifyErr) {
+      console.error('Post-commit notification failed:', notifyErr.message);
+    }
 
-    await query(`INSERT INTO [Payments].[WalletTransaction] (WalletID, TransactionID, Amount, BalanceBefore, Direction, TransactionType, CreatedAt)
-      VALUES (@WalletID, @TxnID, @Amount, @Balance, 'C', 'WalletTopUp', SYSDATETIME())`, {
-      WalletID: w.WalletID, TxnID: txn.TransactionID, Amount, Balance: w.Balance,
-    });
-
-    return successResponse({ transaction: txn, newBalance: parseFloat(w.Balance) + amount }, 'Wallet topped up');
+    return successResponse({ transaction: { TransactionID, Amount: amount }, newBalance: NewBalance }, 'Wallet topped up');
   }
 
   async getTransactionHistory(userId, filters = {}) {
-    let q = `SELECT t.*, cs.SessionCode FROM [Payments].[Transaction] t
-      LEFT JOIN [Operations].[ChargingSession] cs ON t.SessionID = cs.SessionID
-      WHERE 1=1`;
-    const params = {};
-    if (userId) { q += ` AND t.UserID = @UserID`; params.UserID = userId; }
-    if (filters.status) { q += ` AND t.TransactionStatus = @Status`; params.Status = filters.status; }
-    if (filters.type) { q += ` AND t.TransactionType = @Type`; params.Type = filters.type; }
-    q += ` ORDER BY t.TransactedAt DESC`;
-    if (filters.page && filters.limit) {
-      const offset = (filters.page - 1) * filters.limit;
-      q += ` OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY`;
-      params.Offset = offset;
-      params.Limit = filters.limit;
-    }
-    const result = await query(q, params);
-    return result.recordset;
+    const params = { UserID: userId, Page: filters.page || 1, Limit: filters.limit || 50 };
+    if (filters.status) params.Status = filters.status;
+    if (filters.type) params.Type = filters.type;
+
+    const result = await execute('Payments.sp_GetTransactionHistory', params);
+    return result.recordset || [];
   }
 }
 

@@ -1,33 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Wallet, Plus, ArrowUpRight, ArrowDownLeft, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { api } from '../../services/api';
+import { useSocketEvent } from '../../lib/useSocket';
+import { useMyWallet, useMyTransactions } from '../../lib/useApi';
+import { queryKeys } from '../../lib/queryKeys';
 import PageHeader from '../../components/ui/PageHeader';
 import Modal from '../../components/ui/Modal';
 import StatusBadge from '../../components/ui/StatusBadge';
-import type { Wallet as WalletType, Transaction } from '../../types';
 
 export default function WalletPage() {
-  const [wallet, setWallet] = useState<WalletType | null>(null);
-  const [txns, setTxns] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
+  const { data: wallet, isLoading: walletLoading } = useMyWallet();
+  const { data: txns = [], isLoading: txnsLoading } = useMyTransactions();
   const [showTopUp, setShowTopUp] = useState(false);
   const [amount, setAmount] = useState(100000);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [txFilter, setTxFilter] = useState('');
 
-  const load = () => {
-    Promise.all([
-      api.get('/wallet/my').catch(() => ({ data: null })),
-      api.get('/transactions/my').catch(() => ({ data: [] })),
-    ]).then(([wRes, tRes]) => {
-      if (wRes?.data) setWallet(wRes.data);
-      setTxns(Array.isArray(tRes?.data) ? tRes.data : []);
-    }).finally(() => setLoading(false));
-  };
+  useSocketEvent('wallet:updated', () => {
+    qc.invalidateQueries({ queryKey: queryKeys.wallet.my });
+  });
 
-  useEffect(() => { load(); }, []);
+  useSocketEvent('transaction:new', () => {
+    qc.invalidateQueries({ queryKey: queryKeys.wallet.transactions() });
+  });
 
   const handleTopUp = async () => {
     if (amount <= 0) return;
@@ -36,16 +35,17 @@ export default function WalletPage() {
     try {
       await api.post('/wallet/topup', { amount, paymentMethod: 'BankTransfer' });
       setShowTopUp(false);
-      load();
+      qc.invalidateQueries({ queryKey: queryKeys.wallet.my });
+      qc.invalidateQueries({ queryKey: queryKeys.wallet.transactions() });
     } catch (err: any) { setError(err.message); }
     finally { setSaving(false); }
   };
 
   const presets = [50000, 100000, 200000, 500000, 1000000, 2000000];
 
-  const filtered = txns.filter(t => !txFilter || t.TransactionType === txFilter);
+  const filtered = txns.filter((t: any) => !txFilter || t.TransactionType === txFilter);
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+  if (walletLoading || txnsLoading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
 
   return (
     <div className="space-y-6">

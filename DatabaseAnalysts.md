@@ -1,1576 +1,1676 @@
-# Phân Tích Hệ Thống Cơ Sở Dữ Liệu
-## Hệ thống quản lý mạng lưới trạm sạc xe điện và doanh nghiệp nhượng quyền
+# Hướng Dẫn Hệ Thống Cơ Sở Dữ Liệu
+## Hệ thống quản lý mạng lưới trạm sạc xe điện & doanh nghiệp nhượng quyền
 
 **Tên dự án:** `EV_Charging_System`
-**Nền tảng:** Microsoft SQL Server 2022+ T-SQL
-**Phiên bản tài liệu:** 2.0 (Enterprise Redesign)
-**Mục đích:** Phân tích kiến trúc & thiết kế database enterprise cho đồ án môn học Quản lý Thông tin (IE103)
+**Nền tảng:** Microsoft SQL Server
+**Phiên bản tài liệu:** 3.0 (Hướng dẫn cho người mới)
+**Mục đích:** Giúp bất kỳ ai — dù chưa từng học database — có thể hiểu toàn bộ hệ thống này hoạt động như thế nào.
 
 ---
 
 ## Mục Lục
 
-1. [Tổng quan hệ thống](#1-tổng-quan-hệ-thống)
-2. [Kiến trúc database tổng thể](#2-kiến-trúc-database-tổng-thể)
-3. [Phân tích từng Schema](#3-phân-tích-từng-schema)
-4. [Phân tích từng Bảng](#4-phân-tích-từng-bảng)
-5. [Phân tích Relationships](#5-phân-tích-relationships)
-6. [Phân tích Normalization](#6-phân-tích-normalization)
-7. [Phân tích Indexes & Partitioning](#7-phân-tích-indexes--partitioning)
-8. [Phân tích Stored Procedures](#8-phân-tích-stored-procedures)
-9. [Phân tích Functions](#9-phân-tích-functions)
-10. [Phân tích Triggers](#10-phân-tích-triggers)
-11. [Phân tích Views & Materialized Views](#11-phân-tích-views--materialized-views)
-12. [Phân tích RBAC & Security](#12-phân-tích-rbac--security)
-13. [Phân tích Audit & Soft Delete](#13-phân-tích-audit--soft-delete)
-14. [Phân tích Authentication Architecture](#14-phân-tích-authentication-architecture)
-15. [Phân tích Pricing Engine](#15-phân-tích-pricing-engine)
-16. [Phân tích Payment System](#16-phân-tích-payment-system)
-17. [Phân tích IoT & Monitoring](#17-phân-tích-iot--monitoring)
-18. [Phân tích Analytics & Reporting](#18-phân-tích-analytics--reporting)
-19. [Phân tích Backup & Disaster Recovery](#19-phân-tích-backup--disaster-recovery)
-20. [Phân tích Performance Optimization](#20-phân-tích-performance-optimization)
-21. [Các Business Rules Quan Trọng](#21-các-business-rules-quan-trọng)
-22. [Rủi Ro & Giải Pháp](#22-rủi-ro--giải-pháp)
-23. [Hướng Phát Triển Tương Lai](#23-hướng-phát-triển-tương-lai)
+1. [Giới thiệu dự án](#1-giới-thiệu-dự-án)
+2. [Tổng quan hệ thống](#2-tổng-quan-hệ-thống)
+3. [Kiến thức Database Cơ Bản](#3-kiến-thức-database-cơ-bản)
+4. [Các Module Chính Của Hệ Thống](#4-các-module-chính-của-hệ-thống)
+5. [Giải Thích Từng Bảng](#5-giải-thích-từng-bảng)
+6. [Giải Thích Relationships (Quan Hệ Giữa Các Bảng)](#6-giải-thích-relationships-quan-hệ-giữa-các-bảng)
+7. [Luồng Dữ Liệu Thực Tế](#7-luồng-dữ-liệu-thực-tế)
+8. [Giải Thích Realtime System](#8-giải-thích-realtime-system)
+9. [Giải Thích Analytics & Dashboard](#9-giải-thích-analytics--dashboard)
+10. [Enterprise Features (Tính Năng Doanh Nghiệp)](#10-enterprise-features-tính-năng-doanh-nghiệp)
+11. [Các Tính Năng SQL Server Được Sử Dụng](#11-các-tính-năng-sql-server-được-sử-dụng)
+12. [Các Vấn Đề Database Thực Tế](#12-các-vấn-đề-database-thực-tế)
+13. [Tổng Kết Kiến Trúc](#13-tổng-kết-kiến-trúc)
 
 ---
 
-## 1. Tổng quan hệ thống
+## 1. Giới thiệu dự án
 
-### 1.1 Giới thiệu dự án
+### 1.1 Hệ thống này là gì?
 
-Hệ thống **"Quản lý mạng lưới trạm sạc xe điện và doanh nghiệp nhượng quyền"** phiên bản 2.0 là một nền tảng cơ sở dữ liệu enterprise được thiết kế lại hoàn toàn từ kiến trúc MVP ban đầu. Hệ thống bao phủ toàn bộ chuỗi giá trị: từ hạ tầng vật lý, đối tác nhượng quyền, nhà cung cấp điện, khách hàng & phương tiện, đến vận hành phiên sạc, định giá động, thanh toán đa kênh, giám sát IoT thời gian thực, kiểm toán, phân tích KPI, và báo cáo doanh nghiệp.
+Hãy tưởng tượng bạn đang lái một chiếc xe điện (EV - Electric Vehicle). Xe của bạn sắp hết pin. Bạn cần tìm một trạm sạc gần nhất, đến đó, cắm sạc, và trả tiền.
 
-### 1.2 So sánh MVP (v1.0) vs Enterprise (v2.0)
+Hệ thống **EV_Charging_System** là phần mềm đứng sau quản lý toàn bộ quá trình đó. Nó giống như "bộ não" điều khiển mạng lưới trạm sạc xe điện.
 
-| Tiêu chí | v1.0 (MVP) | v2.0 (Enterprise) |
+### 1.2 Bài toán thực tế nào đang được giải quyết?
+
+**Vấn đề:** Làm sao để một công ty có thể vận hành hàng trăm trạm sạc xe điện trên khắp cả nước một cách hiệu quả?
+
+Các câu hỏi cụ thể cần giải quyết:
+- **Chủ trạm:** Ai đang sạc? Trạm nào đang rảnh? Doanh thu hôm nay bao nhiêu?
+- **Khách hàng:** Tìm trạm gần đây ở đâu? Sạc hết bao nhiêu tiền? Lịch sử sạc thế nào?
+- **Kỹ thuật:** Trạm nào đang hỏng? Cần bảo trì trạm nào?
+- **Quản lý:** Franchise nào hoạt động tốt nhất? Giờ nào cao điểm? Doanh thu tổng thể ra sao?
+
+### 1.3 EV Charging Network là gì?
+
+**EV Charging Network** (Mạng lưới trạm sạc xe điện) là một hệ thống bao gồm:
+- **Trạm sạc (Station):** Nơi đặt các điểm sạc, có thể có mái che, bãi đỗ xe
+- **Điểm sạc (Charging Point):** Từng "cây sạc" riêng lẻ tại trạm, nơi bạn cắm dây vào xe
+- **Hệ thống phần mềm:** Quản lý việc đặt lịch, sạc, thanh toán, giám sát
+
+### 1.4 Franchise hoạt động ra sao?
+
+**Franchise** (Nhượng quyền) giống như mô thức "cho thuê thương hiệu":
+- Công ty mẹ (chủ hệ thống) cho phép các đối tác (Franchise Owner) mở trạm sạc dưới thương hiệu chung
+- Chủ franchise đầu tư trạm sạc, công ty mẹ cung cấp phần mềm và hỗ trợ
+- Doanh thu được chia theo tỷ lệ thỏa thuận (Revenue Share Rate)
+- Ví dụ: Doanh thu 10 triệu, tỷ lệ chia 80%, chủ franchise nhận 8 triệu, công ty mẹ nhận 2 triệu
+
+### 1.5 Ai sử dụng hệ thống này?
+
+| Người dùng | Vai trò | Ví dụ |
 |---|---|---|
-| Schemas | 6 | 9 |
-| Tables | 11 | 48 |
-| Indexes | 15 | 40+ |
-| Stored Procedures | 5 | 8+ |
-| Functions | 2 | 4+ |
-| Triggers | 3 | 8+ |
-| Views | 3 | 10+ |
-| Roles (RBAC) | 4 (SQL Server) | 7 (Application) + 6 (Database) |
-| Permissions | Schema-level | 40+ granular permissions |
-| Audit | ❌ Không có | ✅ Immutable audit + status history |
-| Soft Delete | ❌ Không có | ✅ IsDeleted + DeletedAt |
-| Pricing | Đơn giản (base + multiplier) | Advanced engine (rules, peak hour, region, membership) |
-| Payment | Cơ bản (1 bảng) | Enterprise (8 bảng: gateway, refund, wallet, invoice) |
-| IoT/Monitoring | Cơ bản (2 bảng) | Advanced (5 bảng: telemetry, heartbeat, alerts) |
-| Analytics | ❌ Không có | ✅ Materialized KPIs, hourly/day aggregation |
-| Partitioning | ❌ Không có | ✅ Prepared strategy |
-| RLS | ❌ Không có | ✅ Row-Level Security |
-| Data Masking | ❌ Không có | ✅ Dynamic Data Masking |
-| Normalization | 3NF | 3NF/BCNF + denormalization có kiểm soát |
-
-### 1.3 Mục tiêu kiến trúc
-
-| Mục tiêu | Mô tả |
-|---|---|
-| **Domain-Driven Design** | 9 schema riêng biệt, mỗi schema là một domain boundary |
-| **Microservice-Ready** | Mỗi schema có thể độc lập thành microservice |
-| **Scalability** | Partitioning sẵn sàng, columnstore cho analytics, read replicas |
-| **Auditability** | Mọi thay đổi đều được ghi lại, immutable audit logs |
-| **Security-by-Design** | RBAC, RLS, data masking, encryption, least privilege |
-| **Analytics-Ready** | Materialized views, pre-aggregated KPIs, BI-ready schema |
+| **Customer (Khách hàng)** | Người dùng cuối — đến trạm sạc xe | Bạn, tôi, bất kỳ ai có xe điện |
+| **Franchise Owner (Chủ franchise)** | Người đầu tư trạm sạc | Anh A mở 5 trạm sạc ở quận 1 |
+| **Operator (Điều hành viên)** | Nhân viên vận hành hệ thống | Nhân viên công ty mẹ giám sát mạng lưới |
+| **Technician (Kỹ thuật viên)** | Người sửa chữa, bảo trì | Kỹ sư đến kiểm tra trạm hỏng |
+| **System Admin (Quản trị hệ thống)** | Người quản lý toàn bộ hệ thống | Quản lý IT, có toàn quyền |
+| **ReadOnly (Người xem)** | Chỉ xem báo cáo, không thao tác | Giám đốc, đối tác |
 
 ---
 
-## 2. Kiến trúc database tổng thể
+## 2. Tổng quan hệ thống
 
-### 2.1 Sơ đồ kiến trúc schema
+### 2.1 Kiến trúc tổng thể
+
+Hệ thống của chúng ta có 4 phần chính, hoạt động cùng nhau:
 
 ```
-EV_Charging_System
-│
-├── Infrastructure          ← Tài sản vật lý, địa lý, hợp đồng (10 tables)
-│   ├── Country / Region / Address       ← Địa lý chuẩn hóa
-│   ├── Franchise                        ← Doanh nghiệp nhượng quyền
-│   ├── ElectricitySupplier              ← Nhà cung cấp điện
-│   ├── StationModel                     ← Danh mục model trạm sạc
-│   ├── ChargingStation / ChargingPoint  ← Trạm & điểm sạc (mở rộng)
-│   ├── StationElectricityContract       ← Hợp đồng điện (many-to-many)
-│   └── StationDocument                  ← Tài liệu pháp lý
-│
-├── Access                  ← RBAC, phân quyền (3 tables)
-│   ├── Role / Permission / RolePermission
-│
-├── Users                   ← Danh tính, xác thực, phương tiện (8 tables)
-│   ├── User / UserProfile / UserCredential ← Tách biệt identity & auth
-│   ├── UserSession / UserLoginHistory      ← Session & audit
-│   ├── UserRole                           ← Phân quyền người dùng
-│   ├── Vehicle                            ← Phương tiện (mở rộng)
-│   └── UserPaymentMethod                  ← Phương thức thanh toán
-│
-├── Operations              ← Vận hành cốt lõi (8 tables)
-│   ├── PricingPolicy / PricingRule          ← Định giá đa tầng
-│   ├── PeakHourDefinition                   ← Khung giờ cao/thấp điểm
-│   ├── MembershipTier / UserMembership      ← Khách hàng thân thiết
-│   ├── ChargingSession (mở rộng)            ← Phiên sạc (17+ fields)
-│   └── MaintenanceSchedule                  ← Bảo trì (mở rộng)
-│
-├── Payments               ← Tài chính, thanh toán (8 tables)
-│   ├── PaymentGateway                      ← Cổng thanh toán
-│   ├── Transaction / TransactionStatusHistory ← Giao dịch + audit
-│   ├── GatewayTransaction                  ← Trace cổng thanh toán
-│   ├── RefundTransaction                   ← Hoàn tiền
-│   ├── Wallet / WalletTransaction          ← Ví + sổ cái
-│   └── Invoice / InvoiceLineItem           ← Hóa đơn
-│
-├── Monitoring             ← IoT, giám sát (5 tables)
-│   ├── ErrorLog                            ← Nhật ký lỗi (mở rộng)
-│   ├── PointTelemetry                      ← Telemetry thời gian thực
-│   ├── StationHeartbeat                    ← Heartbeat kết nối
-│   ├── AlertRule / Alert                   ← Cảnh báo thông minh
-│
-├── Audit                  ← Kiểm toán bất biến (5 tables)
-│   ├── AuditLog                            ← Audit trail toàn hệ thống
-│   ├── StationStatusHistory / PointStatusHistory ← Lịch sử trạng thái
-│   ├── SessionStatusHistory                ← Lịch sử phiên sạc
-│   └── SchemaChangeLog                     ← DDL migration tracking
-│
-├── Analytics              ← KPI, tổng hợp (3 tables + 2 indexed views)
-│   ├── DailyStationKPI / DailyFranchiseKPI  ← KPI ngày
-│   ├── HourlySessionAgg                     ← Tổng hợp giờ
-│   ├── ivw_MonthlyRevenueSummary            ← Materialized view
-│   └── ivw_DailyStationAvailability         ← Materialized view
-│
-└── Reporting              ← Business views (10+ views, read-only)
-    ├── vw_ActiveChargingSessions
-    ├── vw_StationAvailability
-    ├── vw_CustomerChargingSummary
-    ├── vw_FranchisePerformanceSummary
-    ├── vw_DailyRevenueTrend
-    ├── vw_PeakHourAnalysis
-    ├── vw_EnergyCostAnalysis
-    ├── vw_StationUptimeAnalysis
-    ├── vw_AuditTrailSummary
-    └── ...
+┌──────────────────────────────────────────────────────────────┐
+│                     NGƯỜI DÙNG                               │
+│  (App điện thoại, Website, Dashboard quản lý, ...)           │
+└────────────────────┬─────────────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────────────┐
+│                     BACKEND (Xử lý logic)                    │
+│  - Nhận yêu cầu từ Frontend                                  │
+│  - Xử lý nghiệp vụ (bắt đầu sạc, tính tiền, ...)              │
+│  - Giao tiếp với Database                                    │
+│  - Gửi thông báo Realtime                                    │
+└────────────────────┬─────────────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────────────┐
+│                     DATABASE (SQL Server)                    │
+│  - Lưu trữ toàn bộ dữ liệu                                   │
+│  - Đảm bảo dữ liệu nhất quán, an toàn                        │
+│  - Xử lý các truy vấn phức tạp                              │
+│  - Tự động cập nhật analytics                                │
+└────────────────────┬─────────────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────────────┐
+│              REALTIME (Socket.IO / WebSocket)                │
+│  - Gửi cập nhật tức thời đến người dùng                      │
+│  - Thông báo trạng thái trạm, số dư ví, ...                  │
+│  - Dashboard cập nhật số liệu live                           │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 Domain Boundaries & Coupling
+### 2.2 Các phần giải thích đơn giản
 
-| Schema | Business Domain | Coupling | Scaling Strategy |
+| Thành phần | Giải thích dễ hiểu | Ví dụ |
+|---|---|---|
+| **Frontend** | Phần người dùng nhìn thấy và tương tác | App điện thoại để tìm trạm sạc, website quản lý doanh thu |
+| **Backend** | "Bộ não" xử lý logic — người dùng không thấy | Khi bạn nhấn "Bắt đầu sạc", Backend kiểm tra trạm còn rảnh không, tính giá, lưu dữ liệu |
+| **Database** | "Kho lưu trữ" chứa toàn bộ thông tin | Tên bạn, trạm sạc ở đâu, bạn đã sạc bao nhiêu lần, tốn bao nhiêu tiền |
+| **Realtime System** | Hệ thống gửi cập nhật tức thời | Khi bạn sạc xong, số dư ví trong app tự động giảm mà không cần refresh trang |
+| **Analytics System** | Hệ thống phân tích dữ liệu để ra báo cáo | Biểu đồ doanh thu theo tháng, trạm nào đông nhất, giờ nào cao điểm |
+
+### 2.3 Dữ liệu đi từ đâu đến đâu?
+
+**Ví dụ: Một người dùng bắt đầu sạc**
+
+```
+Bước 1: Người dùng mở app → chọn trạm → nhấn "Bắt đầu sạc"
+            │
+            ▼
+Bước 2: Frontend gửi yêu cầu đến Backend
+            │
+            ▼
+Bước 3: Backend kiểm tra:
+        - Tài khoản còn hoạt động không?
+        - Điểm sạc còn trống không?
+        - Giá điện hiện tại là bao nhiêu?
+            │
+            ▼
+Bước 4: Backend ghi vào Database:
+        - Tạo phiên sạc mới
+        - Đánh dấu điểm sạc là "đang bận"
+        - Ghi lại lịch sử
+            │
+            ▼
+Bước 5: Backend gửi phản hồi về Frontend:
+        "Bắt đầu sạc thành công!"
+            │
+            ▼
+Bước 6: Realtime gửi cập nhật cho mọi người:
+        - Chủ trạm thấy: "Điểm sạc số 3 đang bận"
+        - Dashboard cập nhật số liệu
+```
+
+---
+
+## 3. Kiến thức Database Cơ Bản
+
+> **Phần này dành cho bạn chưa từng học database. Đừng lo — chúng ta sẽ đi từ những thứ căn bản nhất.**
+
+### 3.1 Database là gì?
+
+**Database** (Cơ sở dữ liệu) giống như một **tủ hồ sơ khổng lồ** được sắp xếp cực kỳ ngăn nắp.
+
+Hãy tưởng tượng bạn có một tủ hồ sơ giấy:
+- **Tủ hồ sơ** = Database (cơ sở dữ liệu)
+- **Ngăn kéo** = Schema (khu vực chứa)
+- **Bìa hồ sơ** = Table (bảng)
+- **Tờ giấy trong bìa** = Row (dòng/bản ghi)
+- **Ô thông tin trên tờ giấy** = Column (cột/trường dữ liệu)
+
+### 3.2 Table (Bảng) là gì?
+
+**Table** (Bảng) là nơi chứa một loại thông tin cụ thể.
+
+Ví dụ thực tế trong hệ thống của chúng ta:
+
+| Tên bảng | Chứa thông tin gì? | Ví dụ dữ liệu |
+|---|---|---|
+| `User` | Tài khoản người dùng | Tên đăng nhập, email, số điện thoại |
+| `ChargingStation` | Trạm sạc | Địa chỉ, tên trạm, công suất |
+| `ChargingSession` | Phiên sạc | Ai sạc, sạc lúc nào, bao nhiêu kWh |
+| `Transaction` | Giao dịch thanh toán | Số tiền, ngày thanh toán, trạng thái |
+
+### 3.3 Row (Dòng/Bản ghi) là gì?
+
+**Row** là một **bản ghi cụ thể** trong bảng.
+
+Ví dụ bảng `User` có thể có:
+
+| UserID | Username | Email | Phone |
 |---|---|---|---|
-| Infrastructure | Asset management, geography | Low | Standalone service |
-| Access | Authorization | Very Low | Can be cached/Redis |
-| Users | Identity, profiles | Low | Read replicas |
-| Operations | Charging, pricing | High (central) | Partitioning, sharding |
-| Payments | Financial transactions | High | ACID-critical, separate DB possible |
-| Monitoring | IoT telemetry | Low | Time-series, columnstore |
-| Audit | Compliance | Very Low | Append-only, separate filegroup |
-| Analytics | BI, KPIs | Very Low (ETL) | Columnstore, read-only replica |
-| Reporting | Business intelligence | None (views) | Can be offloaded to SSRS/Power BI |
+| 1 | nguyenvanA | nguyenvana@email.com | 0908123456 |
+| 2 | tranvanB | tranvanb@email.com | 0908987654 |
 
-### 2.3 Nguyên tắc thiết kế
+Mỗi dòng là một người dùng cụ thể. Dòng 1 là thông tin của bạn Nguyễn Văn A.
 
-| Nguyên tắc | Áp dụng |
-|---|---|
-| **Domain-Driven Design** | 9 schema tương ứng 9 domain boundaries |
-| **3NF/BCNF** | Hầu hết bảng đạt chuẩn, denormalization có kiểm soát |
-| **Audit-First** | Mọi bảng có CreatedAt/UpdatedAt/IsDeleted + trigger audit |
-| **Security-by-Design** | RBAC + RLS + Masking + Encryption |
-| **Immutability** | Audit logs không thể sửa/xóa |
-| **Naming Convention** | Nhất quán: PascalCase, singular, rõ ràng |
-| **Parameterization** | Mọi SP đều dùng tham số, không dynamic SQL |
+### 3.4 Column (Cột/Trường) là gì?
 
----
+**Column** là một **loại thông tin** cụ thể.
 
-## 3. Phân tích từng Schema
+Trong bảng `User`:
+- `Username` = Tên đăng nhập (kiểu chữ)
+- `Email` = Địa chỉ email (kiểu chữ)
+- `Phone` = Số điện thoại (kiểu chữ)
+- `CreatedAt` = Ngày tạo tài khoản (kiểu ngày tháng)
 
-### 3.1 `Infrastructure` — Hạ tầng (10 tables)
+Mỗi cột có một **kiểu dữ liệu**:
+- `NVARCHAR` = Chữ (có dấu tiếng Việt)
+- `INT` = Số nguyên
+- `DECIMAL` = Số thập phân (tiền tệ)
+- `DATETIME2` = Ngày tháng năm
+- `BIT` = Đúng/Sai (0 hoặc 1)
 
-**Mục đích:** Quản lý toàn bộ tài sản vật lý, địa lý, nhà cung cấp và hợp đồng.
+### 3.5 Primary Key (Khóa chính) là gì?
 
-**Các bảng mới so với v1:**
-- `Country`, `Region`, `Address` — Chuẩn hóa địa lý (thay vì lưu text address)
-- `StationModel` — Danh mục model trạm sạc (OCPP version, max power)
-- `StationElectricityContract` — Hợp đồng điện many-to-many (thay vì SupplierID cố định)
-- `StationDocument` — Tài liệu pháp lý, bảo hiểm
+**Primary Key** là một cột (hoặc nhiều cột) **định danh duy nhất** mỗi dòng trong bảng.
 
-**Cải tiến so với v1:**
-- `Franchise` thêm: FranchiseCode, FranchiseTier, ContractExpiryDate, IsDeleted, audit columns
-- `ElectricitySupplier` thêm: SupplierCode, CountryID
-- `ChargingStation` thêm: StationCode, StationModelID, AddressID, GPS (Lat/Lng), MaxCapacityKW, FirmwareVersion, NetworkStatus, OperatingHoursJson, HasGenerator, HasSolarPanels, ParkingSpots
-- `ChargingPoint` thêm: PointCode, SerialNumber, CurrentVoltage, CurrentAmperage, LastHeartbeat, FirmwareVersion
+Giống như **số CMND/CCCD** của mỗi người — không ai giống ai.
 
-**Tại sao cần Address chuẩn hóa?**
-v1 lưu địa chỉ text trong ChargingStation, gây khó khăn cho:
-- Tìm kiếm theo khu vực (tất cả trạm ở Quận 1)
-- Phân tích theo vùng miền
-- Tích hợp bản đồ GPS
-- Đảm bảo tính nhất quán (cùng một địa chỉ không bị nhập khác format)
+```text
+Bảng User:
+┌─────────┬──────────────┬─────────────────┐
+│ UserID  │  Username    │  Email          │
+│ (PK)    │              │                 │
+├─────────┼──────────────┼─────────────────┤
+│    1    │  nguyenvanA  │  a@email.com    │  ← UserID = 1 là duy nhất
+│    2    │  tranvanB    │  b@email.com    │  ← UserID = 2 là duy nhất
+│  ...    │  ...         │  ...            │
+└─────────┴──────────────┴─────────────────┘
+```
 
-### 3.2 `Access` — Phân quyền (3 tables)
+Trong hệ thống, `UserID` là khóa chính của bảng `User`. Mỗi người dùng có một `UserID` khác nhau.
 
-**Mục đích:** Quản lý 40+ permission chi tiết, 7 role, mapping role-permission.
+### 3.6 Foreign Key (Khóa ngoại) là gì?
 
-**Các bảng:**
-- `Permission` — Permission chi tiết (VD: `SESSION_START`, `PAYMENT_REFUND`)
-- `Role` — Vai trò (SysAdmin, Operator, Technician, FranchiseOwner, Customer, ReadOnly, ApiService)
-- `RolePermission` — Many-to-many mapping
+**Foreign Key** là một cột trong bảng này **tham chiếu** đến khóa chính của bảng khác.
 
-**Khác biệt với v1:**
-- v1: 4 SQL Server roles với schema-level GRANT
-- v2: 7 application roles + 40+ granular permissions + 6 database roles cho SQL Server security
+Nó tạo ra "mối quan hệ" (relationship) giữa hai bảng.
 
-### 3.3 `Users` — Người dùng (8 tables)
+```text
+Bảng User (Bảng cha):          Bảng ChargingSession (Bảng con):
+┌─────────┬──────────┐         ┌────────────┬─────────┬────────┐
+│ UserID  │ Username │         │ SessionID  │ UserID  │ ...   │
+│ (PK)    │          │         │ (PK)       │ (FK)    │        │
+├─────────┼──────────┤         ├────────────┼─────────┼────────┤
+│    1    │ A       │◄────────│    101     │    1   │ ...   │ ← A sạc
+│    2    │ B       │◄────────│    102     │    2   │ ...   │ ← B sạc
+└─────────┴──────────┘         │    103     │    1   │ ...   │ ← A sạc tiếp
+                               └────────────┴─────────┴────────┘
+```
 
-**Mục đích:** Quản lý danh tính, xác thực, profile, phương tiện.
+**UserID** trong bảng `ChargingSession` là Foreign Key — nó cho biết "người dùng nào" đã thực hiện phiên sạc đó.
 
-**Cải tiến so với v1 (bảng `Customers` duy nhất):**
-- `User` — Core identity (Username, Email, Phone, AccountStatus, FailedLoginAttempts, LockoutEnd)
-- `UserProfile` — Thông tin nhân khẩu (FullName, Avatar, DOB, NationalID, preferences)
-- `UserCredential` — Thông tin xác thực (PasswordHash, PasswordSalt, MFA)
-- `UserSession` — Session tracking (Token, RefreshToken, IP, ExpiresAt)
-- `UserLoginHistory` — Lịch sử đăng nhập bất biến
-- `UserRole` — Phân role cho user
-- `Vehicle` — Phương tiện (thêm: VIN, ModelYear, IsDefault)
-- `UserPaymentMethod` — Phương thức thanh toán lưu sẵn
+### 3.7 Relationship (Quan hệ) là gì?
 
-**Tại sao tách Customers thành nhiều bảng?**
-- **Nguyên lý Separation of Concerns**: Identity ≠ Profile ≠ Credentials
-- **Bảo mật**: PasswordHash và Salt riêng, MFA-ready
-- **Mở rộng**: Dễ thêm fields mà không ảnh hưởng bảng chính
-- **Tuân thủ GDPR**: Dễ xóa PII khi cần
+**Relationship** là cách các bảng liên kết với nhau thông qua Foreign Key.
 
-### 3.4 `Operations` — Vận hành (8 tables)
+Có 3 kiểu quan hệ chính:
 
-**Mục đích:** Quản lý phiên sạc, định giá động, bảo trì.
+| Kiểu | Ý nghĩa | Ví dụ trong hệ thống |
+|---|---|---|
+| **One-to-One** (1-1) | Một bản ghi bảng A tương ứng một bản ghi bảng B | 1 User có 1 UserProfile |
+| **One-to-Many** (1-N) | Một bản ghi bảng A tương ứng nhiều bản ghi bảng B | 1 User có nhiều ChargingSession |
+| **Many-to-Many** (N-N) | Nhiều bản ghi bảng A tương ứng nhiều bản ghi bảng B | 1 Station có nhiều Supplier, 1 Supplier cung cấp cho nhiều Station |
 
-**Cải tiến so với v1:**
-- `PricingPolicy` thêm: PolicyCode, PolicyType, MinChargeFee, ParkingFeePerMin, OverstayPenaltyPerMin, Priority, IsDeleted
-- `PricingRule` **MỚI** — Granular rules (multiplier, discount, fixed price)
-- `PeakHourDefinition` **MỚI** — Định nghĩa khung giờ theo Region + DayOfWeek
-- `MembershipTier` **MỚI** — Hạng thành viên (Bronze/Silver/Gold/Platinum)
-- `UserMembership` **MỚI** — Mapping user → tier
-- `ChargingSession` mở rộng: 17+ fields (xem phân tích 4.8)
-- `MaintenanceSchedule` thêm: PointID, MaintenanceType, PartsUsed, Cost, Priority
+### 3.8 Normalization (Chuẩn hóa) là gì?
 
-### 3.5 `Payments` — Thanh toán (8 tables)
+**Normalization** là kỹ thuật thiết kế database để **tránh trùng lặp dữ liệu** và **đảm bảo tính nhất quán**.
 
-**Mục đích:** Quản lý giao dịch tài chính, ví điện tử, hóa đơn, hoàn tiền.
+**Ví dụ: Không chuẩn hóa (dữ liệu trùng lặp)**
 
-**Các bảng mới (v1 chỉ có 1 bảng `Transactions`):**
-- `PaymentGateway` — Đăng ký cổng thanh toán
-- `Transaction` — Giao dịch (mở rộng: GatewayID, FeeAmount, NetAmount, TransactionStatus)
-- `TransactionStatusHistory` — Lịch sử trạng thái giao dịch
-- `GatewayTransaction` — Trace call đến cổng thanh toán (request/response)
-- `RefundTransaction` — Quản lý hoàn tiền (full/partial)
-- `Wallet` — Ví điện tử
-- `WalletTransaction` — Sổ cái ví (double-entry)
-- `Invoice` + `InvoiceLineItem` — Hóa đơn
-
-### 3.6 `Monitoring` — Giám sát (5 tables)
-
-**Mục đích:** IoT telemetry, heartbeat, cảnh báo thông minh.
-
-**Các bảng mới:**
-- `PointTelemetry` — Dữ liệu cảm biến (Voltage, Amperage, PowerKW, Temperature)
-- `StationHeartbeat` — Kết nối mạng (ResponseTime, SignalStrength, Uptime)
-- `AlertRule` — Ngưỡng cảnh báo cấu hình được
-- `Alert` — Cảnh báo thực tế phát sinh
-
-### 3.7 `Audit` — Kiểm toán (5 tables)
-
-**Mục đích:** Lưu trữ bất biến mọi thay đổi trạng thái.
-
-**Các bảng:**
-- `AuditLog` — Audit trail toàn hệ thống (TableName, RecordID, Action, OldValue, NewValue)
-- `StationStatusHistory` — Lịch sử trạng thái trạm
-- `PointStatusHistory` — Lịch sử trạng thái điểm sạc
-- `SessionStatusHistory` — Lịch sử trạng thái phiên sạc
-- `SchemaChangeLog` — DDL migration tracking
-
-### 3.8 `Analytics` — Phân tích (3 tables + 2 indexed views)
-
-**Mục đích:** Pre-aggregated KPIs cho dashboard thời gian thực.
-
-**Các bảng:**
-- `DailyStationKPI` — KPI hàng ngày theo trạm (TotalSessions, TotalKWh, TotalRevenue, UptimePercent)
-- `DailyFranchiseKPI` — KPI hàng ngày theo franchise
-- `HourlySessionAgg` — Tổng hợp theo giờ (peak hour analysis)
-- `ivw_MonthlyRevenueSummary` — Indexed view (materialized)
-- `ivw_DailyStationAvailability` — Indexed view (materialized)
-
-### 3.9 `Reporting` — Báo cáo (10+ views)
-
-**Mục đích:** Business intelligence views, read-only, không chứa bảng vật lý.
-
----
-
-## 4. Phân tích từng Bảng
-
-### 4.1 `Infrastructure.Address`
-
-| Thuộc tính | Chi tiết |
-|---|---|
-| **Mục đích** | Chuẩn hóa địa chỉ, tái sử dụng cho nhiều entity |
-| **Khóa chính** | `AddressID INT IDENTITY(1,1)` |
-| **Khóa ngoại** | `RegionID` → `Region` |
-
-| Cột | Kiểu | Đặc điểm | Giải thích |
+| Tên KH | Địa chỉ | Tên trạm đã sạc | Địa chỉ trạm |
 |---|---|---|---|
-| `FullAddress` | Computed | Tự động nối Street + Ward + District + RegionName | Không cần maintain |
-| `Latitude` | `DECIMAL(10,7)` | CHECK -90..90 | Tọa độ cho map |
-| `Longitude` | `DECIMAL(10,7)` | CHECK -180..180 | Tọa độ cho map |
+| Nguyễn Văn A | 12 Lê Lợi, Q1 | Trạm sạc Bến Thành | 1 Bến Thành, Q1 |
+| Nguyễn Văn A | 12 Lê Lợi, Q1 | Trạm sạc Lê Lợi | 12 Lê Lợi, Q1 |
 
-**Lợi ích:** Một địa chỉ có thể được tham chiếu bởi nhiều entity (Franchise, Station, UserProfile) mà không trùng lặp dữ liệu.
+→ **Vấn đề:** Địa chỉ của Nguyễn Văn A bị lặp lại 2 lần. Nếu anh ta dọn nhà, phải sửa ở nhiều chỗ.
 
-### 4.2 `Infrastructure.ChargingStation`
+**Sau chuẩn hóa (dữ liệu tách riêng):**
 
-**Cải tiến từ v1:**
-
-| Cột mới | Kiểu | Mục đích |
+| UserID | Tên KH | Địa chỉ |
 |---|---|---|
-| `StationCode` | `NVARCHAR(20)` UNIQUE | Mã trạm (VD: ST001) — thân thiện với người dùng hơn ID số |
-| `StationModelID` | FK → StationModel | Model trạm (tra cứu max power, OCPP version) |
-| `AddressID` | FK → Address | Địa chỉ chuẩn hóa (thay vì text) |
-| `Latitude` / `Longitude` | `DECIMAL(10,7)` | Tọa độ GPS cho mobile app |
-| `MaxCapacityKW` | `DECIMAL(10,2)` | Tổng công suất trạm |
-| `FirmwareVersion` | `NVARCHAR(50)` | Firmware hiện tại |
-| `NetworkStatus` | `NVARCHAR(20)` | Online/Offline/Degraded |
-| `InstallationDate` | `DATE` | Ngày lắp đặt |
-| `OperatingHoursJson` | `NVARCHAR(500)` | JSON giờ hoạt động (flexible) |
-| `HasGenerator` / `HasSolarPanels` | `BIT` | Nguồn điện dự phòng |
-| `ParkingSpots` | `INT` | Số chỗ đỗ |
-| `IsDeleted` / `DeletedAt` | `BIT` / `DATETIME2` | Soft delete |
+| 1 | Nguyễn Văn A | 12 Lê Lợi, Q1 |
 
-### 4.3 `Infrastructure.StationElectricityContract`
-
-**Thay thế mối quan hệ đơn giản `ChargingStation.SupplierID`:**
-
-| Cột | Mục đích |
-|---|---|
-| `StationID` + `SupplierID` | Many-to-many |
-| `ContractNumber` | Số hợp đồng pháp lý |
-| `UnitPricePerKWh` | Giá điện theo hợp đồng |
-| `ContractFrom` / `ContractTo` | Thời hạn hợp đồng |
-| `IsActive` | Hợp đồng hiện tại |
-
-**Lợi ích so với v1:**
-- Một trạm có thể đổi nhà cung cấp, giữ lại lịch sử giá
-- Một nhà cung cấp phục vụ nhiều trạm với giá khác nhau
-- Phân tích chi phí điện theo từng hợp đồng
-
-### 4.4 `Users.UserCredential`
-
-| Cột | Mục đích |
-|---|---|
-| `PasswordHash` + `PasswordSalt` | Hash PBKDF2-SHA256 (không SHA2 đơn thuần như v1) |
-| `HashAlgorithm` | Cho phép nâng cấp thuật toán sau này |
-| `MFAEnabled` / `MFASecret` / `MFAType` | Hỗ trợ MFA (TOTP, SMS, Email) |
-| `PasswordExpiresAt` | Chính sách hết hạn mật khẩu |
-| `RequirePasswordChange` | Buộc đổi mật khẩu lần đầu |
-
-### 4.5 `Operations.PricingPolicy`
-
-**Cải tiến so với v1:**
-
-| Cột mới | Mục đích |
-|---|---|
-| `PolicyCode` | Mã chính sách (VD: STD, PEAK, OFFPEAK) |
-| `PolicyType` | Standard, PeakHour, OffPeak, Holiday, Promotional, Membership, Dynamic |
-| `MinChargeFee` / `MaxChargeFee` | Phí tối thiểu/tối đa |
-| `ParkingFeePerMin` | Phí đỗ xe khi sạc |
-| `OverstayPenaltyPerMin` | Phí quá giờ (sau khi sạc xong) |
-| `Priority` | Độ ưu tiên khi chọn chính sách |
-
-### 4.6 `Operations.PricingRule`
-
-**Bảng hoàn toàn mới — cốt lõi của Pricing Engine:**
-
-| Cột | Mục đích |
-|---|---|
-| `RuleType` | PeakHour, OffPeak, Holiday, Regional, ConsumptionTier, MemberTier, PromoCode |
-| `ConditionJson` | Điều kiện JSON linh hoạt (VD: `{"hours":"17-19","days":"1-5"}`) |
-| `AdjustmentType` | Multiplier, FixedDiscount, PercentageDiscount, FixedPrice, Waiver |
-| `AdjustmentValue` | Giá trị điều chỉnh |
-| `Priority` | Thứ tự ưu tiên áp dụng |
-
-### 4.7 `Operations.ChargingSession` — Phiên sạc (Bảng trung tâm)
-
-**Mở rộng từ 9 lên 28 cột:**
-
-| Nhóm cột | Cột | Mục đích Analytics |
+| SessionID | UserID | StationID |
 |---|---|---|
-| **Nhận dạng** | `SessionCode` | Mã phiên (VD: SES-20250407-001) |
-| | `VehicleID` | Biết xe nào đã sạc → phân tích theo brand/model |
-| | `StationID` | Direct FK (tránh JOIN qua Point) |
-| **Năng lượng** | `StartBatteryPercent` / `EndBatteryPercent` | % pin → tính charging curve |
-| | `MeterStart` / `MeterEnd` | Meter readings → audit trail |
-| | `TotalKWh` | Tổng năng lượng |
-| **Thời gian** | `ChargingDurationMinutes` | Thời gian sạc thực tế |
-| | `AveragePowerKW` / `MaxPowerKW` | Công suất trung bình/đỉnh |
-| **Tài chính** | `CostBeforeDiscount` / `DiscountAmount` | Minh bạch chiết khấu |
-| | `CostTotal` | Thành tiền |
-| **Vận hành** | `StopReason` | Completed, UserStopped, Error, Timeout... |
-| | `SessionSource` | MobileApp, WebPortal, RFID, OCPP... |
-| | `SessionType` | Public, Private, Corporate, Free |
-| | `OcppTransactionID` | Trace OCPP |
+| 101 | 1 | 1 |
+| 102 | 1 | 2 |
 
-### 4.8 `Payments.Transaction`
+| StationID | Tên trạm | Địa chỉ trạm |
+|---|---|---|
+| 1 | Trạm sạc Bến Thành | 1 Bến Thành, Q1 |
+| 2 | Trạm sạc Lê Lợi | 12 Lê Lợi, Q1 |
 
-**Cải tiến so với v1:**
+→ **Lợi ích:** Mỗi thông tin chỉ lưu một lần. Khi cần, chúng ta "nối" (JOIN) các bảng lại.
 
-| Cột mới | Mục đích |
+---
+
+## 4. Các Module Chính Của Hệ Thống
+
+Hệ thống được chia thành các **module** (mô-đun) — mỗi module quản lý một mảng nghiệp vụ riêng.
+
+### 4.1 Tổng quan các module
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                       EV_CHARGING_SYSTEM                             │
+├────────────┬──────────┬──────────┬──────────┬──────────┬─────────────┤
+│   USERS   │  ACCESS  │INFRASTRUC│OPERATIONS│ PAYMENTS │ MONITORING  │
+│  (Người   │  (Phân   │ -TURE    │(Vận hành)│(Thanh    │ (Giám sát)  │
+│   dùng)   │  quyền)  │(Hạ tầng) │          │  toán)   │             │
+├────────────┴──────────┴──────────┴──────────┴──────────┴─────────────┤
+│                        CROSS-CUTTING                                │
+│              AUDIT (Kiểm toán) | ANALYTICS (Phân tích)              │
+│              REPORTING (Báo cáo)                                     │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.2 Module Users — Người dùng
+
+**Mục đích:** Quản lý tài khoản, thông tin cá nhân, phương tiện của người dùng.
+
+**Ví dụ thực tế:**
+- Bạn đăng ký tài khoản → thông tin lưu vào `User`
+- Bạn thêm xe của bạn → thông tin lưu vào `Vehicle`
+- Bạn đăng nhập → hệ thống kiểm tra `UserCredential`
+
+**Các bảng liên quan:**
+
+| Bảng | Lưu gì? |
 |---|---|
-| `TransactionCode` | Mã giao dịch (VD: TXN-20250407-001) |
-| `GatewayID` | FK → PaymentGateway (cổng thanh toán) |
-| `InvoiceID` | FK → Invoice (hóa đơn) |
-| `Direction` | D (Debit) / C (Credit) |
-| `FeeAmount` | Phí giao dịch |
-| `NetAmount` | Computed: Amount - FeeAmount |
-| `AmountBaseCurrency` | Computed: Amount / ExchangeRate |
-| `TransactionStatus` | Pending, Processing, Completed, Failed, Refunded, Cancelled |
-| `PaymentMethod` | Wallet, CreditCard, VNPay, Momo... |
+| `User` | Thông tin cơ bản: tên đăng nhập, email, số điện thoại |
+| `UserProfile` | Thông tin chi tiết: họ tên, ảnh đại diện, ngày sinh |
+| `UserCredential` | Thông tin bảo mật: mật khẩu đã mã hóa, MFA |
+| `UserSession` | Phiên đăng nhập: token, thời gian hết hạn |
+| `UserLoginHistory` | Lịch sử đăng nhập (không thể xóa) |
+| `Vehicle` | Xe của người dùng: biển số, hãng, model năm |
+| `UserPaymentMethod` | Phương thức thanh toán lưu sẵn |
 
-### 4.9 `Monitoring.PointTelemetry`
+**Tại sao lại tách thành nhiều bảng?**
 
-**Bảng mới cho IoT:**
+Để **an toàn** và **dễ mở rộng**:
+- Thông tin cá nhân (`UserProfile`) tách riêng khỏi thông tin đăng nhập (`UserCredential`)
+- Nếu có yêu cầu xóa dữ liệu cá nhân (GDPR), chỉ cần xóa `UserProfile` mà không ảnh hưởng đến lịch sử giao dịch
+- Mật khẩu được lưu riêng, mã hóa an toàn
 
-| Cột | Mục đích |
+### 4.3 Module Access — Phân quyền
+
+**Mục đích:** Kiểm soát **ai được làm gì** trong hệ thống.
+
+**Ví dụ thực tế:**
+- Customer chỉ được bắt đầu sạc, không được sửa giá
+- FranchiseOwner chỉ xem được trạm của mình, không xem được của đối thủ
+- Admin có toàn quyền
+
+**Cách hoạt động:**
+
+```
+User ──── có ────> Role ──── có nhiều ────> Permission
+                                                   │
+                                                   ▼
+                                        "được phép làm gì"
+                                        (VD: SESSION_START,
+                                         PAYMENT_REFUND, ...)
+```
+
+### 4.4 Module Infrastructure — Hạ tầng
+
+**Mục đích:** Quản lý các tài sản vật lý: trạm sạc, điểm sạc, địa chỉ, nhà cung cấp điện.
+
+**Ví dụ thực tế:**
+- Công ty lắp đặt một trạm sạc mới ở Quận 1 → thông tin vào `ChargingStation`
+- Trạm đó có 4 điểm sạc → thông tin vào `ChargingPoint`
+- Trạm ký hợp đồng với Điện Lực TP.HCM → thông tin vào `StationElectricityContract`
+
+**Module này quản lý:**
+
+```
+Country (Quốc gia)
+    └── Region (Tỉnh/Thành phố)
+            └── Address (Địa chỉ cụ thể)
+                    ├── Franchise (Doanh nghiệp nhượng quyền)
+                    └── ChargingStation (Trạm sạc)
+                            └── ChargingPoint (Điểm sạc)
+```
+
+### 4.5 Module Operations — Vận hành
+
+**Mục đích:** Quản lý phần **cốt lõi** — phiên sạc, định giá, bảo trì.
+
+**Đây là module quan trọng nhất của hệ thống.**
+
+**Các bảng liên quan:**
+
+| Bảng | Lưu gì? |
 |---|---|
-| `Voltage` | Điện áp hiện tại (V) |
-| `Amperage` | Cường độ dòng điện (A) |
-| `PowerKW` | Công suất tức thời |
-| `TemperatureC` | Nhiệt độ điểm sạc |
-| `EnergyDeliveredKWh` | Năng lượng đã cung cấp |
-| `CableStatus` | Connected / Disconnected / Fault |
-| `ErrorFlags` | Bitmask lỗi thiết bị |
-
-**Tần suất ghi:** Mỗi 5-15 giây từ IoT device → khối lượng dữ liệu lớn → cần partitioning.
-
-### 4.10 `Audit.AuditLog`
-
-**Bảng audit bất biến:**
-
-| Cột | Mục đích |
-|---|---|
-| `TableName` | Bảng bị thay đổi |
-| `RecordID` | ID bản ghi |
-| `Action` | I (Insert) / U (Update) / D (Delete) |
-| `OldValue` / `NewValue` | JSON của giá trị cũ/mới |
-| `ChangedByUserID` | Ai thay đổi |
-| `ChangedByIP` | Từ IP nào |
-
-**Tính bất biến:** Trigger `trg_AuditLog_Immutable` chặn mọi UPDATE/DELETE trên bảng này.
-
----
-
-## 5. Phân tích Relationships
-
-### 5.1 Sơ đồ quan hệ chính
-
-```
-[Country] ──1:N──> [Region] ──1:N──> [Address]
-                                          │
-              ┌───────────────────────────┤
-              ▼                           ▼
-      [Franchise]                 [ChargingStation] ──N:1──> [StationModel]
-              │                           │
-              │                       1:N │           ┌──────────────────┐
-              │                           ▼           │StationElectricity│
-              │                    [ChargingPoint] ───│Contract          │
-              │                           │           └──────────────────┘
-              │                           │ N:1                │
-              │                           ▼                    ▼
-              │                    [ErrorLog]         [ElectricitySupplier]
-              │                    [PointTelemetry]
-              │
-              │                    ┌───────────────────┐
-              │                    │[ChargingSession]  │─── [PricingPolicy]
-              └─────────────── N:1 │(bảng trung tâm)   │─── [MembershipTier]
-                                   │                   │─── [Vehicle]
-                                   └───────────────────┘
-                                           │ 1:1
-                                           ▼
-                                   [Transaction] ─── [Gateway]
-                                        │              │
-                                        ▼              ▼
-                                   [RefundTransaction]
-                                   [Invoice] ── [InvoiceLineItem]
-                                   [Wallet] ── [WalletTransaction]
-```
-
-### 5.2 Ma trận quan hệ chi tiết
-
-| Bảng 1 | Quan hệ | Bảng 2 | Khóa ngoại | Ý nghĩa |
-|---|---|---|---|---|
-| `ChargingStation` | N:1 | `Franchise` | `FranchiseID` | Một franchise có nhiều station |
-| `ChargingPoint` | N:1 | `ChargingStation` | `StationID` | Một station có nhiều point |
-| `ChargingSession` | N:1 | `User` | `UserID` | Một user có nhiều session |
-| `ChargingSession` | N:1 | `Vehicle` | `VehicleID` | Một xe có nhiều session |
-| `ChargingSession` | N:1 | `ChargingPoint` | `PointID` | Một point có nhiều session |
-| `Transaction` | 1:1 | `ChargingSession` | `SessionID` | Mỗi session 1 transaction |
-| `Transaction` | N:1 | `PaymentGateway` | `GatewayID` | Gateway xử lý nhiều transaction |
-| `InvoiceLineItem` | N:1 | `Invoice` | `InvoiceID` | Một invoice có nhiều line item |
-| `UserCredential` | 1:1 | `User` | `UserID` | Mỗi user có 1 credential |
-| `UserProfile` | 1:1 | `User` | `UserID` | Mỗi user có 1 profile |
-
-### 5.3 Đặc điểm thiết kế relationship
-
-| Đặc điểm | v1.0 | v2.0 | Lý do |
-|---|---|---|---|
-| `ON DELETE CASCADE` | Không dùng | Không dùng | An toàn dữ liệu |
-| `ON DELETE SET NULL` | Không dùng | Có dùng (một số FK) | Cho phép xóa reference mà không mất data |
-| Soft delete | Không có | `IsDeleted BIT` | Phục hồi dữ liệu khi cần |
-| Audit FK | Không có | SESSION_CONTEXT cho UserID | Biết ai thay đổi dữ liệu |
-
----
-
-## 6. Phân tích Normalization
-
-### 6.1 Đánh giá chuẩn hóa
-
-| Bảng | 1NF | 2NF | 3NF | BCNF | Ghi chú |
-|---|---|---|---|---|---|
-| `Country` | ✅ | ✅ | ✅ | ✅ | |
-| `Region` | ✅ | ✅ | ✅ | ✅ | |
-| `Address` | ✅ | ✅ | ✅ | ✅ | Computed column cho FullAddress |
-| `Franchise` | ✅ | ✅ | ✅ | ✅ | |
-| `ChargingStation` | ✅ | ✅ | ✅ | ✅ | StationModelID → model details (3NF) |
-| `ChargingPoint` | ✅ | ✅ | ✅ | ✅ | |
-| `User` | ✅ | ✅ | ✅ | ✅ | |
-| `ChargingSession` | ✅ | ✅ | ⚠️ | ⚠️ | Xem phân tích dưới |
-| `Transaction` | ✅ | ✅ | ✅ | ✅ | |
-| `WalletTransaction` | ✅ | ✅ | ✅ | ✅ | |
-| `AuditLog` | ✅ | ✅ | ✅ | ✅ | |
-
-### 6.2 Denormalization có chủ đích trong ChargingSession
-
-**`ChargingSession.UserID` và `ChargingSession.StationID`** được lưu trực tiếp dù có thể suy ra qua JOIN:
-- `UserID` → từ `SessionID → UserID` (có sẵn)
-- `StationID` → từ `PointID → StationID`
-
-**Lý do denormalize:**
-- ChargingSession là bảng được query nhiều nhất trong hệ thống
-- Thêm StationID giúp tránh 1 JOIN (Point → Station) trong mọi query báo cáo
-- Với 100M+ sessions, tiết kiệm hàng tỷ JOIN operations
-- Đây là **denormalization có kiểm soát**: dữ liệu vẫn nhất quán vì không thể có StationID khác với PointID.StationID
-
-### 6.3 Ví dụ phân tích 3NF cho ChargingSession
-
-**1NF:** Mỗi cột nguyên tử. ✅
-- Không có cột nào chứa multiple values
-
-**2NF:** Phụ thuộc đầy đủ vào khóa chính (SessionID). ✅
-- `TotalKWh` phụ thuộc vào `SessionID`
-- `StartTime` phụ thuộc vào `SessionID`
-- Không có phụ thuộc từng phần (PK đơn cột)
-
-**3NF:** Không có phụ thuộc bắc cầu. ⚠️
-- `StationID` phụ thuộc vào `PointID`, và `PointID` phụ thuộc vào `SessionID`
-- Đây là transitive dependency: `SessionID → PointID → StationID`
-- **Giải pháp:** Chấp nhận denormalization vì performance (xem trên)
-
-**BCNF:** Mọi determinant đều là candidate key. ✅
-- Không có phụ thuộc hàm không tầm thường nào vi phạm BCNF
-
----
-
-## 7. Phân tích Indexes & Partitioning
-
-### 7.1 Chiến lược indexing
-
-| Index Type | Số lượng | Mục đích |
-|---|---|---|
-| Clustered PK | 48 | Mặc định trên IDENTITY |
-| Nonclustered FK | 15+ | JOIN performance |
-| Covering index | 12+ | Query được cover hoàn toàn |
-| Filtered index | 5+ | Chỉ index trên subset dữ liệu active |
-| Columnstore | 1 (comment) | Analytics queries |
-
-### 7.2 Covering Indexes quan trọng
-
-**`IX_ChargingSession_RevenueAnalytics`**
-```sql
-CREATE NONCLUSTERED INDEX IX_ChargingSession_RevenueAnalytics
-    ON Operations.ChargingSession (StartTime, SessionStatus)
-    INCLUDE (StationID, UserID, TotalKWh, CostTotal, ChargingDurationMinutes, AveragePowerKW)
-    WHERE SessionStatus = N'Completed' AND IsDeleted = 0;
-```
-- **Cover:** Mọi query báo cáo doanh thu, năng lượng, duration
-- **Filtered:** Chỉ index session đã hoàn thành (90%+ queries)
-- **Kích thước:** Giảm 90% so với index full table
-
-**`IX_Transaction_DateRange`**
-```sql
-CREATE NONCLUSTERED INDEX IX_Transaction_DateRange
-    ON Payments.Transaction (TransactedAt DESC)
-    INCLUDE (UserID, Amount, TransactionType, TransactionStatus, FeeAmount)
-    WHERE IsDeleted = 0;
-```
-- **Mục đích:** Báo cáo tài chính, lịch sử giao dịch
-- **INCLUDE:** Mọi cột cần cho SUM/COUNT/AVG
-
-### 7.3 Filtered Indexes
-
-| Index | Filter | Tiết kiệm |
-|---|---|---|
-| `IX_ChargingPoint_Status` | `WHERE PointStatus IN ('Available','Busy')` | Chỉ index 60% points |
-| `IX_UserSession_Token` | `WHERE IsRevoked = 0` | Chỉ index session active |
-| `IX_ChargingSession_PointID_Status` | `WHERE SessionStatus = 'Charging'` | Chỉ index session đang sạc |
-| `IX_Alert_Status` | `WHERE AlertStatus IN ('Open','Acknowledged')` | Chỉ index alert chưa xử lý |
-| `IX_MaintenanceSchedule_Date` | `WHERE ScheduleStatus IN ('Scheduled','InProgress')` | Chỉ index lịch chưa hoàn thành |
-
-### 7.4 Partitioning Strategy
-
-**Partition function (đã chuẩn bị, chưa kích hoạt):**
-
-| Bảng | Partition Key | Range | Mục đích |
-|---|---|---|---|
-| `ChargingSession` | `StartTime` (YEAR) | 2024-2029+ | Sliding window archive |
-| `Transaction` | `TransactedAt` (YEAR) | 2024-2029+ | Financial data retention |
-| `PointTelemetry` | `RecordedAt` (MONTH) | Rolling 12 months | Time-series pruning |
-| `ErrorLog` | `OccurredAt` (YEAR) | 2024-2029+ | Compliance retention |
-| `AuditLog` | `ChangedAt` (YEAR) | 2024-2029+ | Immutable log retention |
-
-**Lợi ích của partitioning:**
-```sql
--- Có thể archive dữ liệu cũ bằng SWITCH (sub-second thay vì DELETE hàng giờ)
-ALTER TABLE Operations.ChargingSession SWITCH PARTITION 1 TO Archive.ChargingSession_2024;
-```
-
-### 7.5 Columnstore cho Analytics
-
-Columnstore index được comment trong code, sẵn sàng kích hoạt:
-```sql
-CREATE NONCLUSTERED COLUMNSTORE INDEX CSIX_ChargingSession_Analytics
-    ON Operations.ChargingSession (StartTime, EndTime, StationID, UserID,
-        TotalKWh, CostTotal, ChargingDurationMinutes, SessionStatus, SessionType)
-    WHERE IsDeleted = 0;
-```
-- **Tăng tốc:** 10-100x cho aggregation queries
-- **Nén:** 5-10x compression ratio
-
----
-
-## 8. Phân tích Stored Procedures
-
-### 8.1 `Operations.sp_StartChargingSession`
-
-**Cải tiến từ v1:**
-
-| Tính năng | v1.0 | v2.0 |
-|---|---|---|
-| VehicleID | Không có | Có (track xe nào đang sạc) |
-| SessionSource | Mặc định hardcode | Tham số (@Source) |
-| Pricing policy | Chọn cố định (@PolicyID) | Tự động chọn policy active |
-| Membership | Không có | Tự động áp dụng membership tier |
-| Audit | Không có | INSERT vào SessionStatusHistory |
-| Error handling | RAISERROR + return code | THROW (chuẩn SQL Server) |
-| Point update | Trigger | Stored procedure + trigger (double safety) |
-
-**Flow:**
-```
-1. Validate user (AccountStatus = 'Active')
-2. Validate point (PointStatus = 'Available')
-3. Tự động chọn PricingPolicy active (ORDER BY Priority)
-4. Lấy MembershipTier hiện tại của user
-5. BEGIN TRANSACTION
-6. INSERT ChargingSession với đầy đủ fields
-7. UPDATE ChargingPoint → Busy
-8. INSERT Audit.SessionStatusHistory
-9. COMMIT
-```
-
-### 8.2 `Operations.sp_EndChargingSession`
-
-**Cải tiến từ v1:**
-
-| Tính năng | v1.0 | v2.0 |
-|---|---|---|
-| Meter readings | ❌ | ✅ MeterStart/MeterEnd |
-| Battery percent | ❌ | ✅ StartBatteryPercent/EndBatteryPercent |
-| Duration | Tính lại mỗi lần | ✅ Lưu ChargingDurationMinutes |
-| Avg power | ❌ | ✅ AveragePowerKW |
-| Discount | ❌ | ✅ CostBeforeDiscount + DiscountAmount |
-| Stop reason | Hardcode | ✅ Tham số hóa |
-| Pricing | Gọi function | ✅ Gọi pricing engine + membership discount |
-
-### 8.3 `Payments.sp_CreatePayment`
-
-**Kiến trúc mới hoàn toàn:**
-
-```
-1. Kiểm tra session tồn tại và completed
-2. Kiểm tra duplicate payment (chống thanh toán 2 lần)
-3. BEGIN TRANSACTION
-4. INSERT Transaction (code tự sinh: TXN-yyyyMMdd-HHmmss-SessionID)
-5. Nếu payment method = Wallet:
-   a. Kiểm tra số dư
-   b. UPDATE Wallet (Balance - Amount)
-   c. INSERT WalletTransaction (double-entry)
-6. INSERT TransactionStatusHistory
-7. COMMIT
-```
-
-### 8.4 `Payments.sp_ProcessRefund`
-
-**Flow hoàn tiền enterprise:**
-```
-1. Kiểm tra OriginalTransaction tồn tại, completed
-2. Tính tổng đã hoàn (không vượt quá original amount)
-3. BEGIN TRANSACTION
-4. INSERT RefundTransaction (tự động: Full/Partial)
-5. UPDATE Transaction Status → Refunded / PartiallyRefunded
-6. COMMIT
-```
-
-### 8.5 `Analytics.sp_DailyKPIAggregation`
-
-**ETL procedure cho analytics:**
-
-Sử dụng `MERGE` để upsert vào:
-- `Analytics.DailyStationKPI` — tổng hợp session, kWh, revenue, errors
-- `Analytics.DailyFranchiseKPI` — tổng hợp commission, active stations
-- `Analytics.HourlySessionAgg` — tổng hợp theo giờ
-
-**Tần suất chạy:** Daily qua SQL Agent Job.
-
-### 8.6 `Reporting.sp_GetMonthlyRevenueReport`
-
-**Cải tiến từ v1:**
-- **Pagination:** OFFSET/FETCH NEXT (trang 1, 2, 3...)
-- **Filter:** Theo FranchiseID (tùy chọn)
-- **Thêm chỉ số:** TotalKWh, TotalCommission, ActiveStations
-- **Count query riêng:** Cho tổng số records
-
-### 8.7 Xử lý lỗi & Transaction
-
-Tất cả stored procedures đều tuân theo pattern:
-```sql
-SET NOCOUNT ON;
-SET XACT_ABORT ON;  -- ← Tự động rollback khi có lỗi
-
-BEGIN TRY
-    BEGIN TRANSACTION
-    -- business logic
-    COMMIT
-END TRY
-BEGIN CATCH
-    IF @@TRANCOUNT > 0 ROLLBACK;
-    THROW;  -- ← Giữ nguyên error thay vì RAISERROR
-END CATCH
-```
-
-**`SET XACT_ABORT ON`** là cải tiến quan trọng so với v1:
-- Tự động rollback khi có runtime error (chia 0, violation...)
-- Không cần kiểm tra @@TRANCOUNT trong mọi catch block
-- Giảm risk inconsistent data
-
----
-
-## 9. Phân tích Functions
-
-### 9.1 `Operations.fn_CalculateChargingCost` (Cải tiến)
-
-**So sánh v1 vs v2:**
-
-| v1.0 | v2.0 |
-|---|---|
-| 3 tham số: Total_kWh, BasePrice, Multiplier | 4 tham số: + DiscountPercent |
-| Multiplier do caller truyền vào | Tự động phát hiện peak hour |
-| Không discount | Discount từ membership tier |
-| `RETURN MONEY` | `RETURN MONEY` |
-
-**Logic mới:**
-1. Phát hiện giờ cao điểm (17:00-19:00, weekday) → multiplier 1.5
-2. Phát hiện giờ thấp điểm (22:00-05:00) → multiplier 0.7
-3. Áp dụng BasePrice × Multiplier
-4. Áp dụng discount: `EffectivePrice × (1 - DiscountPercent / 100)`
-
-### 9.2 `Operations.fn_GetEffectivePrice` (Mới)
-
-**Pricing engine function:**
-- Input: PolicyID, RegionID, StartTime, TotalKWh
-- Output: Giá hiệu quả sau khi áp dụng tất cả PricingRules
-- Duyệt rules theo Priority, áp dụng AdjustmentType/AdjustmentValue
-
-### 9.3 `Reporting.fn_GetStationUtilizationRate` (Mới)
-
-**Tính tỷ lệ sử dụng trạm:**
-```
-Utilization = Σ(session duration overlapping với period) / TotalPeriodDuration × 100
-```
-Xử lý session bắt đầu trước hoặc kết thúc sau period.
-
-### 9.4 `Reporting.fn_GetFranchiseCommission` (Mới)
-
-**Tính hoa hồng franchise:**
-```
-Commission = Σ(Session.CostTotal) × Franchise.RevenueShareRate / 100
-```
-Trong khoảng thời gian với status = Completed.
-
----
-
-## 10. Phân tích Triggers
-
-### 10.1 Ma trận trigger v2.0
-
-| Trigger | Bảng | Event | Mục đích |
-|---|---|---|---|
-| `trg_ChargingPoint_StatusChange` | ChargingPoint | AFTER UPDATE | Audit status history + auto error log |
-| `trg_ChargingStation_StatusChange` | ChargingStation | AFTER UPDATE | Audit status history |
-| `trg_ChargingSession_StatusChange` | ChargingSession | AFTER UPDATE | Audit session status history |
-| `trg_ChargingSession_PointSync` | ChargingSession | AFTER INSERT, UPDATE | Đồng bộ PointStatus (safety backup) |
-| `trg_Transaction_Immutable` | Transaction | AFTER UPDATE | Chặn sửa completed/refunded transactions |
-| `trg_AuditLog_Immutable` | AuditLog | INSTEAD OF DELETE, UPDATE | Audit logs bất biến |
-| `trg_User_SoftDelete` | User | AFTER UPDATE | Cascade soft delete |
-| `trg_RolePermission_Audit` | RolePermission | AFTER INSERT, UPDATE, DELETE | Audit thay đổi phân quyền |
-
-### 10.2 Cơ chế đồng bộ PointStatus (Cải tiến)
-
-**v1.0:** Chỉ có trigger trên ChargingSession cập nhật ChargingPoint
-
-**v2.0:** **Double safety** — cả trigger và stored procedure đều cập nhật:
-- Stored procedure: `UPDATE ChargingPoint SET PointStatus = 'Busy'`
-- Trigger: `trg_ChargingSession_PointSync` cũng cập nhật (dự phòng nếu có code bypass SP)
-
-**Bảo vệ trùng lặp:** Mỗi cập nhật chỉ thực hiện khi status hiện tại khớp với expected:
-- `SET Busy WHERE Currently = 'Available'`
-- `SET Available WHERE Currently = 'Busy'`
-
-### 10.3 Tính bất biến của AuditLog
-
-**Trigger:** `INSTEAD OF DELETE, UPDATE`
-```sql
-CREATE TRIGGER Audit.trg_AuditLog_Immutable
-ON Audit.AuditLog
-INSTEAD OF DELETE, UPDATE
-AS
-    THROW 51002, N'Audit log entries are immutable.', 16;
-```
-
-Đây là **rào chắn cuối cùng**: ngay cả DBA cũng không thể xóa audit log qua SQL trực tiếp. (Chỉ có thể truncate table với quyền sysadmin.)
-
----
-
-## 11. Phân tích Views & Materialized Views
-
-### 11.1 Business Views
-
-| View | Bảng nguồn | Số JOIN | Mục đích |
-|---|---|---|---|
-| `vw_ActiveChargingSessions` | 7 tables | 6 JOIN | Dashboard real-time |
-| `vw_StationAvailability` | 4 tables | 3 JOIN | Trạng thái trạm |
-| `vw_CustomerChargingSummary` | 4 tables | 3 JOIN | Lifetime value customer |
-| `vw_FranchisePerformanceSummary` | 4 tables | 3 JOIN | Performance franchise |
-| `vw_DailyRevenueTrend` | 3 tables | 2 JOIN | Xu hướng doanh thu |
-| `vw_PeakHourAnalysis` | 1 table | 0 JOIN | Phân tích giờ cao điểm |
-| `vw_EnergyCostAnalysis` | 4 tables | 3 JOIN | Lợi nhuận theo năng lượng |
-| `vw_StationUptimeAnalysis` | 3 tables | 2 JOIN | Độ tin cậy trạm |
-| `vw_AuditTrailSummary` | 3 tables | 3 JOIN | Timeline kiểm toán |
-
-### 11.2 Indexed (Materialized) Views
-
-**`Analytics.ivw_MonthlyRevenueSummary`**
-```sql
-CREATE VIEW Analytics.ivw_MonthlyRevenueSummary
-WITH SCHEMABINDING
-AS
-SELECT YEAR(StartTime), MONTH(StartTime), StationID,
-       COUNT_BIG(*), COUNT_BIG(DISTINCT UserID),
-       SUM(TotalKWh), SUM(CostTotal)
-FROM Operations.ChargingSession
-WHERE SessionStatus = 'Completed' AND IsDeleted = 0
-GROUP BY YEAR(StartTime), MONTH(StartTime), StationID;
-
-CREATE UNIQUE CLUSTERED INDEX CI_ivw_MonthlyRevenueSummary ON ...
-```
-
-**Lợi ích:**
-- Dữ liệu được duy trì vật lý, tự động cập nhật
-- Query báo cáo doanh thu không cần scan bảng gốc
-- Phù hợp cho dashboard và Power BI
-
----
-
-## 12. Phân tích RBAC & Security
-
-### 12.1 Mô hình phân quyền 3 lớp
-
-```
-Lớp 1: SQL Server Logins (Server Level)
-    ├── ev2_admin_login
-    ├── ev2_operator_login
-    ├── ev2_technician_login
-    ├── ev2_franchise_login
-    ├── ev2_readonly_login
-    └── ev2_app_service_login
-
-Lớp 2: Database Roles (SQL Server)
-    ├── db_role_admin        → CONTROL mọi schema
-    ├── db_role_operator     → CRUD Operations, Payments, SELECT others
-    ├── db_role_technician   → CRUD Infrastructure, Monitoring, SELECT Operations
-    ├── db_role_franchise    → SELECT limited (filtered by RLS)
-    ├── db_role_readonly     → SELECT on reporting schemas
-    └── db_role_app_service  → SELECT, INSERT, UPDATE Operations/Monitoring
-
-Lớp 3: Application Roles (Access schema)
-    ├── SysAdmin (level 100)     → 40+ permissions
-    ├── Operator (level 80)      → 25+ permissions
-    ├── Technician (level 60)    → 15+ permissions
-    ├── FranchiseOwner (level 50)→ 6 permissions
-    ├── Customer (level 20)      → 5 permissions
-    ├── ReadOnly (level 10)      → 10 permissions
-    └── ApiService (level 30)    → 8 permissions
-```
-
-### 12.2 40+ Granular Permissions
-
-**Module Users:**
-`USER_CREATE`, `USER_READ`, `USER_UPDATE`, `USER_DELETE`, `USER_IMPERSONATE`
-
-**Module Operations:**
-`SESSION_START`, `SESSION_STOP`, `SESSION_CANCEL`, `SESSION_OVERRIDE`, `PRICING_CREATE`, `PRICING_READ`, `PRICING_UPDATE`
-
-**Module Payments:**
-`PAYMENT_READ`, `PAYMENT_REFUND`, `PAYMENT_ADJUST`
-
-**Module Monitoring:**
-`MONITOR_READ`, `ALERT_CONFIG`, `ALERT_ACK`
-
-### 12.3 Row-Level Security (RLS)
-
-FranchiseOwner chỉ thấy được dữ liệu của franchise mình:
-```sql
-CREATE FUNCTION Access.fn_FranchiseFilter (@FranchiseID INT)
-RETURNS TABLE
-AS RETURN SELECT 1 AS IsAccessible
-WHERE IS_ROLEMEMBER(N'db_role_admin') = 1
-   OR IS_ROLEMEMBER(N'db_role_franchise') = 1 AND ...;
-
-CREATE SECURITY POLICY Access.FranchiseFilterPolicy
-    ADD FILTER PREDICATE Access.fn_FranchiseFilter (FranchiseID)
-    ON Infrastructure.Franchise;
-```
-
-### 12.4 Dynamic Data Masking
-
-| Cột | Mask Function |
-|---|---|
-| `User.Email` | `email()` |
-| `User.Phone` | `partial(2, "XXXX", 2)` |
-| `UserProfile.FullName` | `partial(1, "XXXX", 0)` |
-| `UserProfile.NationalID` | `partial(2, "XXXX", 2)` |
-| `PaymentGateway.MerchantID` | `partial(2, "XXXX", 2)` |
-
----
-
-## 13. Phân tích Audit & Soft Delete
-
-### 13.1 Audit Columns
-
-Mọi bảng business (trừ bảng lookup) đều có:
-```sql
-CreatedAt   DATETIME2   NOT NULL DEFAULT SYSDATETIME()
-UpdatedAt   DATETIME2   NULL
-DeletedAt   DATETIME2   NULL
-IsDeleted   BIT         NOT NULL DEFAULT 0
-CreatedBy   INT         NULL
-UpdatedBy   INT         NULL
-```
-
-### 13.2 Soft Delete Strategy
-
-| Thao tác | Kỹ thuật | Trigger |
-|---|---|---|
-| Xóa user | `UPDATE SET IsDeleted=1, DeletedAt=SYSDATETIME()` | Cascade: Vehicles + Sessions |
-| Xóa station | `UPDATE SET IsDeleted=1` | Manual cascade qua app |
-| Xóa session | `UPDATE SET IsDeleted=1` | Chỉ admin |
-
-**Lợi ích của soft delete:**
-- Có thể phục hồi dữ liệu
-- Giữ toàn vẹn tham chiếu (FK không bị lỗi)
-- Audit trail vẫn còn
-- Dữ liệu lịch sử vẫn có trong báo cáo (dùng WHERE IsDeleted=0)
-
-### 13.3 Immutable Audit Trail
-
-```
-User action → Trigger captures OldValue/NewValue → INSERT AuditLog
-                                  ↓
-                     AuditLog không thể UPDATE/DELETE
-                                  ↓
-                     Dùng cho compliance, investigation
-```
-
----
-
-## 14. Phân tích Authentication Architecture
-
-### 14.1 So sánh v1 vs v2
-
-| Thành phần | v1.0 | v2.0 |
-|---|---|---|
-| Lưu trữ | 1 bảng Customers | 5 bảng: User + UserProfile + UserCredential + UserSession + UserLoginHistory |
-| Password hash | SHA2-256 (thô) | PBKDF2-SHA256 + Salt |
-| MFA | ❌ | ✅ TOTP/SMS/Email |
-| Session | ❌ | ✅ Token + RefreshToken |
-| Login history | ❌ | ✅ Bất biến, có IP + UserAgent |
-| Lockout | ❌ | ✅ FailedLoginAttempts + LockoutEnd |
-| Password expiry | ❌ | ✅ PasswordExpiresAt |
-
-### 14.2 Security Flow
-
-```
-Login Request
-    ↓
-User.FindByEmail(Email)
-    ↓
-Check AccountStatus = 'Active'
-    ↓
-Verify PasswordHash (PBKDF2-SHA256)
-    ↓
-IF failed:
-    Increment FailedLoginAttempts
-    IF >= MaxAttempts: SET LockoutEnd
-    INSERT UserLoginHistory (Success=0)
-    ↓
-IF success:
-    Reset FailedLoginAttempts
-    INSERT UserSession (token, refreshToken, expires)
-    INSERT UserLoginHistory (Success=1, IP, UserAgent)
-    ↓
-Return SessionToken + RefreshToken
-```
-
----
-
-## 15. Phân tích Pricing Engine
-
-### 15.1 Kiến trúc Pricing Engine
-
-```
-User starts charging
-    ↓
-sp_StartChargingSession
-    ↓
-Tự động chọn PricingPolicy active (Priority cao nhất)
-    ↓
-Lấy MembershipTier của user
-    ↓
-Session ghi nhận PolicyID + MembershipTierID
-    ↓
-User ends charging
-    ↓
-sp_EndChargingSession
-    ↓
-fn_CalculateChargingCost(TotalKWh, BasePrice, Discount, StartTime)
-    ├── Phát hiện Peak Hour (17:00-19:00) → multiplier 1.5
-    ├── Phát hiện Off-Peak (22:00-05:00) → multiplier 0.7
-    ├── Áp dụng BasePrice × Multiplier
-    └── Áp dụng Membership Discount
-```
-
-### 15.2 Pricing Rule Types
-
-| RuleType | Hành vi | Ví dụ |
-|---|---|---|
-| `PeakHour` | Multiplier | 1.5x cho 17:00-19:00 |
-| `OffPeak` | Multiplier | 0.7x cho 22:00-05:00 |
-| `Holiday` | Multiplier | 1.2x cho ngày lễ |
-| `ConsumptionTier` | FixedDiscount | Giảm 500đ/kWh cho >30kWh |
-| `MemberTier` | PercentageDiscount | Gold: -10%, Platinum: -15% |
-| `PromoCode` | FixedPrice | 3000đ/kWh cho mã PROMO30 |
-| `Regional` | Multiplier | Khu vực khác nhau, giá khác nhau |
-
-### 15.3 Future Extensibility
-
-Cấu trúc `PricingRule.ConditionJson` cho phép thêm bất kỳ điều kiện nào:
-```json
-{"hours": "17-19", "days": "1-5", "min_kwh": 10, "max_kwh": 50, "station_ids": [1,2,3]}
-```
-
-Không cần thay đổi schema để thêm loại pricing mới — chỉ cần INSERT rule mới.
-
----
-
-## 16. Phân tích Payment System
-
-### 16.1 Kiến trúc thanh toán
+| `ChargingSession` | Phiên sạc: ai sạc, sạc ở đâu, bao nhiêu điện, bao nhiêu tiền |
+| `PricingPolicy` | Chính sách giá: giá cơ bản, phí đỗ xe, phí quá giờ |
+| `PricingRule` | Quy tắc giá chi tiết: giảm giá giờ thấp điểm, tăng giá giờ cao điểm |
+| `PeakHourDefinition` | Khung giờ cao điểm / thấp điểm |
+| `MembershipTier` | Hạng thành viên: Đồng, Bạc, Vàng, Bạch Kim |
+| `UserMembership` | Người dùng nào thuộc hạng nào |
+| `MaintenanceSchedule` | Lịch bảo trì trạm sạc |
+
+### 4.6 Module Payments — Thanh toán
+
+**Mục đích:** Xử lý tiền bạc — thanh toán, ví điện tử, hóa đơn, hoàn tiền.
+
+**Ví dụ thực tế:**
+- Bạn sạc xong, hệ thống tự động trừ tiền từ ví
+- Bạn muốn xem hóa đơn chi tiết
+- Bạn yêu cầu hoàn tiền vì trạm sạc bị lỗi
+
+**Cách tiền chảy trong hệ thống:**
 
 ```
 ChargingSession kết thúc
-    ↓
-sp_CreatePayment
-    ├── Tạo Transaction (Pending)
-    ├── Nếu Wallet:
-    │   ├── Kiểm tra Balance >= Amount
-    │   ├── Wallet.Balance -= Amount
-    │   └── WalletTransaction (double-entry)
-    ├── Nếu Gateway:
-    │   ├── Gọi API cổng thanh toán
-    │   ├── GatewayTransaction (request/response)
-    │   └── Transaction → Completed / Failed
-    └── TransactionStatusHistory
+        │
+        ▼
+Transaction được tạo (Pending)
+        │
+        ├── Nếu thanh toán bằng Ví (Wallet):
+        │       Kiểm tra số dư → Trừ tiền → Ghi sổ cái
+        │
+        └── Nếu thanh toán qua Cổng (Gateway):
+                Gọi API ngân hàng → Thành công/Thất bại
+        │
+        ▼
+TransactionStatusHistory (ghi lại toàn bộ lịch sử)
 ```
 
-### 16.2 ACID Guarantees
+### 4.7 Module Monitoring — Giám sát
 
-| Tính chất | Cơ chế |
+**Mục đích:** Theo dõi tình trạng hoạt động của các trạm sạc theo thời gian thực.
+
+**Ví dụ thực tế:**
+- Trạm sạc gửi tín hiệu "tôi còn sống" mỗi 30 giây (`StationHeartbeat`)
+- Cảm biến ghi lại điện áp, dòng điện, nhiệt độ mỗi 5-15 giây (`PointTelemetry`)
+- Nếu nhiệt độ quá cao → hệ thống tự động tạo cảnh báo (`Alert`)
+
+### 4.8 Module Audit — Kiểm toán
+
+**Mục đích:** Ghi lại **mọi thay đổi** trong hệ thống, không thể xóa hay sửa.
+
+**Ví dụ thực tế:**
+- Admin sửa giá điện → `AuditLog` ghi lại: ai sửa, giá cũ, giá mới, lúc nào
+- Một giao dịch bị khiếu nại → tra cứu `AuditLog` để điều tra
+
+### 4.9 Module Analytics — Phân tích
+
+**Mục đích:** Tổng hợp dữ liệu thành các chỉ số KPI để báo cáo, phân tích.
+
+**Ví dụ thực tế:**
+- Dashboard hiển thị: "Hôm nay có 150 phiên sạc, doanh thu 45 triệu"
+- Biểu đồ: "Giờ cao điểm là 17h-19h"
+- Báo cáo: "Trạm Bến Thành có doanh thu cao nhất tháng"
+
+### 4.10 Module Reporting — Báo cáo
+
+**Mục đích:** Cung cấp các **view** (góc nhìn) dữ liệu cho báo cáo và business intelligence.
+
+Không lưu dữ liệu riêng, chỉ "nhìn" vào dữ liệu từ các module khác và trình bày dưới dạng dễ đọc.
+
+---
+
+## 5. Giải Thích Từng Bảng
+
+### 5.1 Bảng User (Người dùng)
+
+| Câu hỏi | Trả lời |
 |---|---|
-| **Atomicity** | BEGIN TRAN / COMMIT / ROLLBACK — toàn bộ hoặc không có gì |
-| **Consistency** | CHECK constraints (`Balance >= 0`, `Amount > 0`) + FK |
-| **Isolation** | `READ_COMMITTED_SNAPSHOT = ON` — không dirty read |
-| **Durability** | `RECOVERY FULL` + transaction log backups |
+| **Dùng để lưu gì?** | Thông tin cơ bản của mỗi người dùng hệ thống |
+| **Tại sao cần?** | Không có bảng này thì không biết ai đang sử dụng hệ thống |
+| **Khóa chính** | `UserID` — mỗi người dùng có một số định danh duy nhất |
 
-### 16.3 Refund Flow
+**Các cột quan trọng:**
 
-```
-RefundRequest (Amount, Reason)
-    ↓
-Kiểm tra OriginalTransaction = Completed
-    ↓
-Kiểm tra tổng refund <= OriginalAmount
-    ↓
-Tạo RefundTransaction (Status = Pending → Approved)
-    ↓
-Cập nhật TransactionStatus (Refunded / PartiallyRefunded)
-    ↓
-Gọi Gateway refund API
-    ↓
-RefundTransaction.Status = Completed
-```
-
-### 16.4 Financial Consistency
-
-**Double-entry ledger trong WalletTransaction:**
-```
-WalletTransaction.Amount + WalletTransaction.BalanceBefore = BalanceAfter
-(Tính tự động bằng computed column)
-```
-
-Mỗi giao dịch debit phải có:
-- Transaction tương ứng (để truy xuất nguồn gốc)
-- Wallet giảm tương ứng (số dư không thể âm)
-
----
-
-## 17. Phân tích IoT & Monitoring
-
-### 17.1 IoT Data Flow
-
-```
-ChargingPoint (IoT device)
-    ↓ MQTT/WebSocket (OCPP 2.0.1)
-StationHeartbeat (mỗi 30 giây)
-    ↓
-PointTelemetry (mỗi 5-15 giây — Voltage, Amperage, Power, Temperature)
-    ↓
-AlertRule Evaluation
-    ├── Nếu vượt ngưỡng → INSERT Alert
-    └── Nếu lỗi → INSERT ErrorLog
-```
-
-### 17.2 Alert Rules
-
-Các ngưỡng cảnh báo có thể cấu hình (không hardcode):
-| Rule | Metric | Condition | Severity |
-|---|---|---|---|
-| Quá nhiệt | TemperatureC | > 60°C | Critical |
-| Quá dòng | Amperage | > 125% rated | High |
-| Mất kết nối | Heartbeat | > 5 phút không có | High |
-| Điện áp bất thường | Voltage | < 200V hoặc > 260V | Medium |
-
-### 17.3 Heartbeat Monitoring
-
-`StationHeartbeat` ghi mỗi 30 giây:
-- `NetworkStatus` (Online/Offline/Degraded)
-- `ResponseTimeMs` (độ trễ)
-- `UptimeSeconds` (thời gian online)
-- `IsHealthy` (tổng hợp)
-
-Cho phép tính **uptime SLA** cho mỗi trạm.
-
----
-
-## 18. Phân tích Analytics & Reporting
-
-### 18.1 OLTP vs OLAP Separation
-
-```
-OLTP (Operational)                          OLAP (Analytical)
-──────────────────────────                  ──────────────────────────
-Infrastructure.ChargingStation              Analytics.DailyStationKPI
-Operations.ChargingSession                  Analytics.DailyFranchiseKPI
-Payments.Transaction                        Analytics.HourlySessionAgg
-Monitoring.ErrorLog                         Analytics.ivw_MonthlyRevenueSummary
-
-                    ▲                               ▲
-                    │        sp_DailyKPIAggregation (ETL)
-                    └───────────────────────────────┘
-```
-
-### 18.2 KPI Dashboards
-
-**Station KPI (DailyStationKPI):**
-| Chỉ số | Nguồn |
+| Cột | Giải thích dễ hiểu |
 |---|---|
-| TotalSessions | COUNT(SessionID) |
-| TotalKWh | SUM(TotalKWh) |
-| TotalRevenue | SUM(CostTotal) |
-| AvgPowerKW | AVG(AveragePowerKW) |
-| AvgChargingMinutes | AVG(ChargingDurationMinutes) |
-| PeakConcurrentSessions | MAX(concurrent) |
-| UniqueUsers | COUNT(DISTINCT UserID) |
-| ErrorCount | COUNT(ErrorLog) |
-| UptimePercent | Tính từ heartbeat |
-| RevenuePerKWh | Computed: Revenue / KWh |
+| `Username` | Tên đăng nhập, ví dụ: `nguyenvanA` |
+| `Email` | Địa chỉ email, dùng để đăng nhập hoặc khôi phục mật khẩu |
+| `Phone` | Số điện thoại |
+| `AccountStatus` | Tình trạng tài khoản: `Active` (đang hoạt động), `Locked` (bị khóa), `Closed` (đã đóng) |
+| `FailedLoginAttempts` | Số lần đăng nhập sai — nếu quá 5 lần thì tài khoản bị khóa |
+| `LockoutEnd` | Thời gian kết thúc khóa tài khoản |
 
-**Franchise KPI (DailyFranchiseKPI):**
-| Chỉ số | Ý nghĩa |
+**Bảng này liên kết với:**
+- `UserProfile` — 1-1 (mỗi user có một profile)
+- `UserCredential` — 1-1 (mỗi user có một thông tin đăng nhập)
+- `ChargingSession` — 1-N (một user có nhiều phiên sạc)
+- `UserRole` — 1-N (một user có thể có nhiều vai trò)
+
+**Vòng đời dữ liệu:**
+```
+Đăng ký → Active → (có thể bị khóa) → (có thể bị xóa mềm)
+```
+
+### 5.2 Bảng ChargingStation (Trạm sạc)
+
+| Câu hỏi | Trả lời |
 |---|---|
-| TotalSessions | Tổng session các station |
-| TotalRevenue | Tổng doanh thu |
-| CommissionAmount | Revenue × ShareRate / 100 |
-| ActiveStations | Station đang hoạt động |
-| TotalErrors | Lỗi trên toàn franchise |
+| **Dùng để lưu gì?** | Thông tin từng trạm sạc vật lý |
+| **Tại sao cần?** | Để biết trạm nào ở đâu, thuộc franchise nào, công suất bao nhiêu |
+| **Khóa chính** | `StationID` |
+| **Khóa ngoại** | `FranchiseID` → Franchise, `AddressID` → Address, `StationModelID` → StationModel |
 
-### 18.3 Reporting Views (Business Intelligence)
+**Các cột quan trọng:**
 
-**`vw_PeakHourAnalysis`** — Phân tích khung giờ:
-- HourOfDay, DayOfWeek, SessionCount, TotalKWh, TotalRevenue, AvgDuration
+| Cột | Giải thích dễ hiểu |
+|---|---|
+| `StationCode` | Mã trạm, VD: `ST001` — dễ nhớ hơn số ID |
+| `StationName` | Tên trạm, VD: "Trạm sạc Bến Thành" |
+| `Latitude`, `Longitude` | Tọa độ GPS — để hiển thị trên bản đồ |
+| `MaxCapacityKW` | Tổng công suất tối đa của trạm |
+| `NetworkStatus` | Trạng thái mạng: `Online`, `Offline`, `Degraded` |
+| `HasGenerator`, `HasSolarPanels` | Có máy phát điện / pin mặt trời không? |
+| `ParkingSpots` | Số chỗ đỗ xe |
+| `OperatingHoursJson` | Giờ hoạt động (lưu dạng JSON để linh hoạt) |
 
-**`vw_EnergyCostAnalysis`** — Phân tích lợi nhuận:
-- TotalKWhDelivered, ElectricityUnitPrice, TotalElectricityCost, TotalRevenue, GrossMargin
+**Business Rule quan trọng:**
+- Mỗi trạm có **StationCode duy nhất** — không thể có 2 trạm cùng mã
+- Khi xóa trạm, dùng **Soft Delete** (đánh dấu là đã xóa, không xóa thật)
 
-**`vw_CustomerChargingSummary`** — RFM Segmentation:
-- TotalSessions, LifetimeKWh, LifetimeSpend, AvgSpendPerSession, DaysSinceLastCharge
+### 5.3 Bảng ChargingPoint (Điểm sạc)
 
-### 18.4 Materialized (Indexed) Views
+| Câu hỏi | Trả lời |
+|---|---|
+| **Dùng để lưu gì?** | Từng "cây sạc" riêng lẻ trong một trạm |
+| **Tại sao cần?** | Một trạm có nhiều điểm sạc, cần quản lý từng điểm |
+| **Khóa chính** | `PointID` |
+| **Khóa ngoại** | `StationID` → ChargingStation |
 
-**`ivw_MonthlyRevenueSummary`:**
-- Pre-aggregated theo tháng + station
-- Duy trì tự động (indexed view)
-- Query báo cáo không scan bảng gốc
+**Ví dụ:** Trạm Bến Thành có 4 điểm sạc → 4 dòng trong bảng `ChargingPoint`
 
----
+**Các cột quan trọng:**
 
-## 19. Phân tích Backup & Disaster Recovery
+| Cột | Giải thích |
+|---|---|
+| `PointCode` | Mã điểm sạc, VD: `ST001-P01` |
+| `PointType` | Loại: `AC` (sạc chậm), `DC` (sạc nhanh) |
+| `PointStatus` | Trạng thái: `Available` (rảnh), `Busy` (đang dùng), `Faulted` (hỏng), `Offline` |
+| `PowerRatingKW` | Công suất định mức, VD: 50kW, 150kW |
+| `SerialNumber` | Số serial của thiết bị |
 
-### 19.1 Backup Strategy
-
-| Loại | Tần suất | Retention | RPO |
-|---|---|---|---|
-| Full | Hàng tuần (CN 01:00) | 30 ngày | Baseline |
-| Differential | Hàng ngày (01:00) | 14 ngày | Giảm log restore chain |
-| Transaction Log | 15 phút | 48 giờ | **15 phút** |
-
-### 19.2 Recovery Objectives
-
-| Tier | Scenario | RPO | RTO | Technology |
-|---|---|---|---|---|
-| 1 | Database corruption | 15 min | 2 hr | Point-in-time recovery |
-| 2 | Server failure | 0 | 30 sec | Always On AG (sync) |
-| 3 | Regional disaster | 5 min | 1 hr | Always On AG (async) |
-| 4 | Full site loss | 15 min | 4 hr | Azure Blob backups + restore |
-
-### 19.3 Point-in-Time Recovery
-
-```sql
--- Step 1: Full backup (NORECOVERY)
-RESTORE DATABASE EV_Charging_System FROM DISK='...full.bak' WITH NORECOVERY;
-
--- Step 2: Differential (NORECOVERY)
-RESTORE DATABASE EV_Charging_System FROM DISK='...diff.bak' WITH NORECOVERY;
-
--- Step 3: Log backups đến thời điểm mong muốn
-RESTORE LOG EV_Charging_System FROM DISK='...log1.trn' WITH NORECOVERY, STOPAT='2025-04-07 14:35:00';
-RESTORE LOG EV_Charging_System FROM DISK='...log2.trn' WITH NORECOVERY, STOPAT='2025-04-07 14:35:00';
-
--- Step 4: Online
-RESTORE DATABASE EV_Charging_System WITH RECOVERY;
+**Vòng đời dữ liệu:**
+```
+Available → Busy (khi có người sạc) → Available (khi sạc xong)
+     ↓                                  ↑
+  Faulted (khi hỏng) ─── Sau sửa ─────┘
 ```
 
-### 19.4 High Availability Architecture
+### 5.4 Bảng ChargingSession (Phiên sạc) — Bảng quan trọng nhất
 
-```
-Primary (Sync) ←→ Secondary (Sync, Read-Only)
-    │
-    └──→ DR Secondary (Async, Geo-redundant)
-```
+| Câu hỏi | Trả lời |
+|---|---|
+| **Dùng để lưu gì?** | Mỗi lần một người dùng sạc xe |
+| **Tại sao cần?** | Đây là trung tâm của toàn bộ hệ thống — mọi thứ xoay quanh phiên sạc |
+| **Khóa chính** | `SessionID` |
 
----
+**Đây là bảng được query nhiều nhất trong toàn hệ thống.**
 
-## 20. Phân tích Performance Optimization
+**Các cột quan trọng (nhóm theo chức năng):**
 
-### 20.1 SARGability
-
-**v1.0 (Non-SARGable):**
-```sql
-WHERE YEAR(t.[Timestamp]) = @Year  -- ← Scan toàn bộ index
-```
-
-**v2.0 (SARGable):**
-```sql
-WHERE t.[Timestamp] >= DATEFROMPARTS(@Year, 1, 1)
-  AND t.[Timestamp] <  DATEFROMPARTS(@Year + 1, 1, 1)
-  -- ← Index Seek
-```
-
-**Tác động:** Chuyển từ Table Scan → Index Seek, tăng tốc 10-100x.
-
-### 20.2 Covering Index Analysis
-
-Query báo cáo doanh thu tháng:
-```sql
-SELECT SUM(CostTotal), AVG(CostTotal)
-FROM Operations.ChargingSession
-WHERE StartTime >= '2025-01-01' AND StartTime < '2025-02-01'
-  AND SessionStatus = 'Completed' AND IsDeleted = 0;
-```
-
-→ `IX_ChargingSession_RevenueAnalytics` cover hoàn toàn query này:
-- **Seek** trên `StartTime`
-- **Predicate** trên `SessionStatus` + `IsDeleted`
-- **INCLUDE** `CostTotal` (không cần Key Lookup)
-
-### 20.3 Query Plan Analysis
-
-| Query | Scan | Seek | Lookup | Index sử dụng |
-|---|---|---|---|---|
-| `SELECT ... WHERE SessionID = ?` | 0 | 1 (PK) | 0 | PK_ChargingSession |
-| `SELECT ... WHERE UserID = ? ORDER BY StartTime DESC` | 0 | 1 | 0 | IX_ChargingSession_UserID |
-| `SUM(CostTotal) GROUP BY MONTH(StartTime)` | 0 | 1 | 0 | IX_ChargingSession_RevenueAnalytics |
-| `SELECT ... WHERE PointStatus = 'Available'` | 0 | 1 | 0 | IX_ChargingPoint_Status |
-| `SELECT ... WHERE Email = ?` | 0 | 1 | 0 | IX_User_Email_AccountStatus |
-
-### 20.4 Transaction Performance
-
-Các stored procedure giữ transaction ngắn nhất có thể:
-- `sp_StartChargingSession`: 1 INSERT + 1 UPDATE + 1 INSERT audit
-- `sp_EndChargingSession`: 1 UPDATE + 1 UPDATE + 1 INSERT audit
-
-Transaction ngắn → lock được giải phóng nhanh → giảm deadlock.
-
-### 20.5 Hot/Cold Data Strategy
-
-| Layer | Time range | Storage | Indexing |
-|---|---|---|---|
-| **Hot** | 0-90 days | SSD, In-Memory OLTP (future) | Full indexing |
-| **Warm** | 90-365 days | Standard storage | Compressed indexes |
-| **Cold** | 1+ years | Archived (Archive schema/DB) | Page compression |
-
----
-
-## 21. Các Business Rules Quan Trọng
-
-### 21.1 Ma trận business rules
-
-| # | Business Rule | Implemented By | File |
-|---|---|---|---|
-| BR1 | Revenue share rate 0-100% | CHECK | `02_CreateTables.sql` |
-| BR2 | Wallet balance >= 0 | CHECK | `02_CreateTables.sql` |
-| BR3 | Mỗi session chỉ một transaction | Trigger + SP | `08_CreateTriggers.sql` + `07_CreateStoredProcedures.sql` |
-| BR4 | Amount khớp session cost | SP validation | `07_CreateStoredProcedures.sql` |
-| BR5 | Tài khoản locked/closed không thể sạc | SP validation | `07_CreateStoredProcedures.sql` |
-| BR6 | Point không Available không thể sạc | SP validation | `07_CreateStoredProcedures.sql` |
-| BR7 | Pricing policy phải còn hiệu lực | SP validation | `07_CreateStoredProcedures.sql` |
-| BR8 | Wallet balance đủ để thanh toán | SP validation | `07_CreateStoredProcedures.sql` |
-| BR9 | Audit logs bất biến | Trigger | `08_CreateTriggers.sql` |
-| BR10 | Completed transactions không thể sửa | Trigger | `08_CreateTriggers.sql` |
-| BR11 | Mỗi station có station code duy nhất | UNIQUE | `02_CreateTables.sql` |
-| BR12 | Mỗi contract number duy nhất | UNIQUE | `02_CreateTables.sql` |
-| BR13 | StartTime < EndTime | CHECK | `02_CreateTables.sql` |
-| BR14 | BatteryPercent 0-100 | CHECK | `02_CreateTables.sql` |
-
-### 21.2 Business Logic Flow: Quy trình sạc hoàn chỉnh
-
-```
-KHÁCH HÀNG                    HỆ THỐNG v2.0
-    │                             │
-    │ [Bắt đầu sạc]              │
-    ├────────────────────────────>│
-    │                             │ sp_StartChargingSession
-    │                             │ ├─ Validate user (active, not locked)
-    │                             │ ├─ Validate point (available)
-    │                             │ ├─ Tự động chọn PricingPolicy
-    │                             │ ├─ Lấy MembershipTier
-    │                             │ ├─ BEGIN TRAN
-    │                             │ ├─ INSERT ChargingSession (18 fields)
-    │                             │ ├─ UPDATE Point → Busy
-    │                             │ ├─ INSERT SessionStatusHistory
-    │                             │ └─ COMMIT
-    │                             │
-    │ <── SessionCode ───────────┤
-    │                             │
-    │ [Kết thúc sạc]             │
-    ├────────────────────────────>│
-    │                             │ sp_EndChargingSession
-    │                             │ ├─ Tính TotalKWh (MeterEnd - MeterStart)
-    │                             │ ├─ Tính DurationMinutes
-    │                             │ ├─ Tính AveragePowerKW
-    │                             │ ├─ fn_CalculateChargingCost (peak/off-peak, discount)
-    │                             │ ├─ BEGIN TRAN
-    │                             │ ├─ UPDATE Session (17 fields)
-    │                             │ ├─ UPDATE Point → Available
-    │                             │ └─ INSERT SessionStatusHistory
-    │                             │
-    │ [Thanh toán]                │
-    ├────────────────────────────>│
-    │                             │ sp_CreatePayment
-    │                             │ ├─ Validate session completed
-    │                             │ ├─ Check duplicate payment
-    │                             │ ├─ BEGIN TRAN
-    │                             │ ├─ INSERT Transaction (20 fields)
-    │                             │ ├─ Wallet: kiểm tra + trừ balance
-    │                             │ ├─ WalletTransaction (double-entry)
-    │                             │ ├─ TransactionStatusHistory
-    │                             │ └─ COMMIT
-    │                             │
-    │ <── TransactionCode ───────┤
-```
-
----
-
-## 22. Rủi Ro & Giải Pháp
-
-### 22.1 Rủi ro hiện tại
-
-| Rủi ro | Mô tả | Mức độ | Giải pháp |
-|---|---|---|---|
-| **Race condition** | Kiểm tra PointStatus và INSERT không atomic trong 100% cases | Trung bình | Thêm `UPDLOCK, HOLDLOCK` hoặc application-level lock |
-| **Không load balancing** | Mọi request vào một DB | Cao | Read replicas + CQRS |
-| **Telemetry volume** | 5-15 giây/record × 1000 points = 5.7M-17M records/ngày | Cao | Partitioning, columnar compression, retention policy |
-| **Pricing consistency** | Giá thay đổi giữa lúc bắt đầu và kết thúc session | Thấp | Đã xử lý bằng cách lưu PolicyID + tính cost tại EndTime |
-| **Data masking bypass** | User có quyền cao có thể unmask | Thấp | Always Encrypted cho PII thực sự nhạy cảm |
-| **Backup storage** | 50GB+ database, backup có thể lớn hơn | Trung bình | Nén backup (COMPRESSION), Azure Blob storage |
-
-### 22.2 Rủi ro đã xử lý
-
-| Rủi ro | Xử lý | File |
+| Nhóm | Cột | Giải thích |
 |---|---|---|
-| Mất tiền do không kiểm tra balance | CHECK + SP validation | `07_CreateStoredProcedures.sql` |
-| Chính sách giá hết hạn giữa phiên sạc | Kiểm tra lại tại EndTime | `07_CreateStoredProcedures.sql` |
-| Xóa nhầm dữ liệu có quan hệ | Không ON DELETE CASCADE | `02_CreateTables.sql` |
-| Mất audit trail | Immutable triggers | `08_CreateTriggers.sql` |
-| Duplicate payment | Check trong SP + unique constraint | `07_CreateStoredProcedures.sql` |
-| Sửa completed transaction | Immutable trigger | `08_CreateTriggers.sql` |
-| SQL injection | Stored procedures + parameterized queries | All SPs |
+| **Nhận dạng** | `SessionCode` | Mã phiên: `SES-20250407-001` (dễ đọc hơn số ID) |
+| | `UserID` | Ai sạc |
+| | `StationID` | Sạc ở trạm nào (lưu trực tiếp để tránh JOIN) |
+| | `PointID` | Sạc ở điểm nào |
+| | `VehicleID` | Xe nào được sạc |
+| **Năng lượng** | `MeterStart`, `MeterEnd` | Chỉ số đồng hồ đầu/cuối |
+| | `TotalKWh` | Tổng số điện đã sạc (MeterEnd - MeterStart) |
+| | `StartBatteryPercent`, `EndBatteryPercent` | % pin đầu/cuối |
+| **Thời gian** | `StartTime`, `EndTime` | Thời gian bắt đầu và kết thúc |
+| | `ChargingDurationMinutes` | Thời gian sạc thực tế (phút) |
+| | `AveragePowerKW`, `MaxPowerKW` | Công suất trung bình và cao nhất |
+| **Tài chính** | `CostBeforeDiscount` | Tiền trước khi giảm giá |
+| | `DiscountAmount` | Tiền được giảm |
+| | `CostTotal` | Tiền phải trả (sau giảm giá) |
+| **Vận hành** | `SessionStatus` | Trạng thái: `Charging`, `Completed`, `Cancelled`, `Error` |
+| | `StopReason` | Lý do kết thúc: `Completed` (sạc đầy), `UserStopped` (người dùng dừng), `Error` (lỗi) |
+| | `SessionSource` | Bắt đầu từ đâu: `MobileApp`, `RFID`, `WebPortal` |
+
+**Tại sao bảng này có quá nhiều cột?**
+
+Vì mỗi phiên sạc cần lưu đầy đủ thông tin để:
+- Tính tiền chính xác
+- Phân tích hành vi người dùng
+- Báo cáo tài chính
+- Kiểm toán khi có khiếu nại
+
+### 5.5 Bảng Transaction (Giao dịch)
+
+| Câu hỏi | Trả lời |
+|---|---|
+| **Dùng để lưu gì?** | Mỗi lần thanh toán |
+| **Tại sao cần?** | Để quản lý dòng tiền, đối soát, kiểm toán |
+| **Khóa chính** | `TransactionID` |
+| **Khóa ngoại** | `SessionID` → ChargingSession (1-1), `GatewayID` → PaymentGateway |
+
+**Các cột quan trọng:**
+
+| Cột | Giải thích |
+|---|---|
+| `TransactionCode` | Mã giao dịch: `TXN-20250407-001` |
+| `Amount` | Số tiền |
+| `Direction` | `D` (Debit - thu), `C` (Credit - chi) |
+| `TransactionStatus` | `Pending`, `Completed`, `Failed`, `Refunded` |
+| `PaymentMethod` | Hình thức: `Wallet`, `CreditCard`, `VNPay`, `Momo` |
+
+**Business Rule:** Mỗi phiên sạc chỉ có **duy nhất 1 giao dịch**.
+
+### 5.6 Bảng PricingPolicy (Chính sách giá)
+
+| Câu hỏi | Trả lời |
+|---|---|
+| **Dùng để lưu gì?** | Các chính sách giá khác nhau |
+| **Tại sao cần?** | Giá sạc điện không cố định — thay đổi theo giờ, theo đối tượng |
+| **Khóa chính** | `PolicyID` |
+
+**Ví dụ các chính sách giá:**
+
+| PolicyCode | PolicyType | Giá cơ bản | Phí đỗ xe | Phí quá giờ |
+|---|---|---|---|---|
+| `STD` | Standard | 3.500đ/kWh | 0đ/phút | 2.000đ/phút |
+| `PEAK` | PeakHour | 5.250đ/kWh | 0đ/phút | 3.000đ/phút |
+| `OFFPEAK` | OffPeak | 2.450đ/kWh | 0đ/phút | 1.000đ/phút |
+| `GOLD` | Membership | 3.150đ/kWh | 0đ/phút | 0đ/phút |
+
+### 5.7 Bảng AuditLog (Nhật ký kiểm toán)
+
+| Câu hỏi | Trả lời |
+|---|---|
+| **Dùng để lưu gì?** | Mọi thay đổi trong hệ thống |
+| **Tại sao cần?** | Để điều tra khi có sự cố, đảm bảo minh bạch |
+| **Khóa chính** | `AuditID` |
+
+**Các cột:**
+
+| Cột | Giải thích |
+|---|---|
+| `TableName` | Bảng nào bị thay đổi (VD: `ChargingStation`) |
+| `RecordID` | Bản ghi nào bị thay đổi (VD: `StationID = 5`) |
+| `Action` | Hành động: `I` (thêm), `U` (sửa), `D` (xóa) |
+| `OldValue` | Giá trị cũ (lưu dạng JSON) |
+| `NewValue` | Giá trị mới (lưu dạng JSON) |
+| `ChangedByUserID` | Ai đã thay đổi |
+| `ChangedAt` | Thay đổi lúc nào |
+
+**Đặc điểm quan trọng:** Dữ liệu trong bảng này **KHÔNG THỂ XÓA HOẶC SỬA** — nó là bất biến.
 
 ---
 
-## 23. Hướng Phát Triển Tương Lai
+## 6. Giải Thích Relationships (Quan Hệ Giữa Các Bảng)
 
-### 23.1 Ngắn hạn (3-6 tháng)
+### 6.1 Tại sao cần relationships?
 
-1. **Kích hoạt partitioning** (hiện đang comment)
-   - `CREATE PARTITION FUNCTION` cho ChargingSession, Transaction, PointTelemetry
-   - Tự động archive partition switching
+Không có relationships, dữ liệu sẽ hỗn loạn:
+- Bạn có một phiên sạc nhưng không biết **của ai** (không có UserID)
+- Bạn xóa một trạm sạc, nhưng các phiên sạc cũ vẫn tham chiếu đến trạm đã mất
 
-2. **Kích hoạt columnstore index**
-   - `CREATE NONCLUSTERED COLUMNSTORE INDEX` cho ChargingSession
-   - Tăng tốc analytics queries 10-100x
+Relationships đảm bảo **tính toàn vẹn dữ liệu**.
 
-3. **Always Encrypted** cho PII
-   - UserCredential.PasswordHash
-   - UserProfile.NationalID
-   - GatewayTransaction.RequestPayload
-
-4. **In-Memory OLTP** cho ChargingSession
-   - Giảm latency cho session start/end
-   - Tăng throughput cho concurrent sessions
-
-### 23.2 Trung hạn (6-12 tháng)
-
-5. **Hệ thống Booking**
-   - Bảng `Booking`: UserID, PointID, ScheduledTime, Duration, Status
-   - Cho phép đặt trước điểm sạc
-
-6. **Loyalty Program mở rộng**
-   - `Rewards`: UserID, Points, Tier, ExpiryDate
-   - Tích điểm, đổi ưu đãi
-
-7. **Real-time Dashboard**
-   - Kết nối SignalR đến vw_ActiveChargingSessions
-   - Power BI direct query
-
-8. **Multi-language support**
-   - Bảng `Localization` cho UI strings
-   - Hỗ trợ tiếng Việt + English
-
-### 23.3 Dài hạn (12-24 tháng)
-
-9. **Microservices migration**
-   - Payment Service (Payments schema → độc lập)
-   - Monitoring Service (Monitoring → độc lập)
-   - User Service (Users → độc lập)
-
-10. **Event Sourcing / CQRS**
-    - Event Store cho mọi state change
-    - Read models optimized cho từng use case
-
-11. **Time-series database cho IoT**
-    - Chuyển PointTelemetry, StationHeartbeat sang InfluxDB/TimescaleDB
-    - Lưu trữ và query hiệu quả hơn
-
-12. **Machine Learning integration**
-    - Dự đoán peak hour dựa trên historical data
-    - Anomaly detection cho telemetry
-    - Predictive maintenance scheduling
-
----
-
-## Phụ Lục A: Thống Kê Database v2.0
-
-| Thành phần | v1.0 (MVP) | v2.0 (Enterprise) | Tăng trưởng |
-|---|---|---|---|
-| Database | 1 | 1 | — |
-| Schema | 6 | 9 | +50% |
-| Tables | 11 | 48 | +336% |
-| Indexes | 15 | 40+ | +167% |
-| Functions | 2 | 4+ | +100% |
-| Stored Procedures | 5 | 8+ | +60% |
-| Triggers | 3 | 8+ | +167% |
-| Views | 3 | 10+ | +233% |
-| Logins | 4 | 6 | +50% |
-| Roles (app) | 0 | 7 | Mới |
-| Permissions | 0 | 40+ | Mới |
-| Roles (DB) | 4 | 6 | +50% |
-| CHECK Constraints | 17 | 45+ | +165% |
-| UNIQUE Constraints | 7 | 15+ | +114% |
-| FOREIGN KEY Constraints | 11 | 50+ | +355% |
-
-## Phụ Lục B: Cấu Trúc Thư Mục v2.0
+### 6.2 Sơ đồ quan hệ tổng thể
 
 ```
-database/
-├── run_all.sql                        ← Master orchestrator (12 bước)
-├── schema/
-│   ├── 01_CreateDatabase.sql          ← Database + 9 schemas
-│   └── 02_CreateTables.sql            ← 48 tables + constraints
-├── indexes/
-│   └── 03_CreateIndexes.sql           ← 40+ indexes + partitioning
-├── security/
-│   └── 04_RBAC_And_Security.sql       ← RBAC, RLS, masking, encryption
-├── seed/
-│   └── 05_SeedData.sql                ← Seed data mở rộng
-├── functions/
-│   └── 06_CreateFunctions.sql         ← 4+ enterprise functions
-├── procedures/
-│   └── 07_CreateStoredProcedures.sql  ← 8+ stored procedures
-├── triggers/
-│   └── 08_CreateTriggers.sql          ← 8+ triggers
-├── views/
-│   └── 09_CreateViews.sql             ← 10+ business views
-├── analytics/
-│   └── 10_AnalyticsObjects.sql        ← Indexed views + KPI procedures
-├── reporting/
-│   └── 11_ReportQueries.sql           ← 10 enterprise reports
-└── backup/
-    └── 12_BackupAndDR.sql             ← Backup + DR strategy
+┌──────────────┐
+│   Country    │
+└──────┬───────┘
+       │ 1:N
+       ▼
+┌──────────────┐
+│   Region     │
+└──────┬───────┘
+       │ 1:N
+       ▼
+┌──────────────┐          ┌──────────────────┐
+│   Address    │◄─────────│   Franchise      │
+└──────┬───────┘  N:1     └──────────────────┘
+       │ 1:N
+       ▼
+┌──────────────────┐       ┌──────────────────┐
+│ ChargingStation  │───────│  StationModel    │
+└──────┬───────────┘  N:1  └──────────────────┘
+       │ 1:N
+       ▼
+┌──────────────────┐       ┌──────────────────────────────┐
+│  ChargingPoint   │       │ StationElectricityContract   │
+└──────┬───────────┘       └──────────────┬───────────────┘
+       │ 1:N                              │ N:1
+       ▼                                  ▼
+┌──────────────────┐              ┌──────────────────┐
+│ ChargingSession  │              │ElectricitySupplier│
+└──────┬───────────┘              └──────────────────┘
+       │ 1:1
+       ▼
+┌──────────────────┐
+│   Transaction    │
+└──────────────────┘
+```
+
+### 6.3 Các quan hệ One-to-One (1-1)
+
+**Ví dụ: User và UserProfile**
+
+```
+User (1) ─────────── (1) UserProfile
+- UserID = 1          - UserID = 1
+- Username = "A"      - FullName = "Nguyễn Văn A"
+                      - Avatar = "avatar.jpg"
+```
+
+**Giải thích:** Mỗi User có **duy nhất một** UserProfile. Mỗi UserProfile thuộc về **duy nhất một** User.
+
+**Tại sao không gộp chung?** Vì thông tin cá nhân (tên thật, ảnh) dễ thay đổi và cần bảo vệ riêng.
+
+### 6.4 Các quan hệ One-to-Many (1-N)
+
+**Ví dụ: Franchise và ChargingStation**
+
+```
+Franchise (1) ─────────── (N) ChargingStation
+- FranchiseID = 1          - StationID = 1, FranchiseID = 1
+  Tên: "ABC Energy"        - StationID = 2, FranchiseID = 1
+                            - StationID = 3, FranchiseID = 1
+```
+
+**Giải thích:** Một Franchise có **nhiều** ChargingStation. Mỗi ChargingStation thuộc về **một** Franchise.
+
+**Ví dụ khác:**
+
+| Quan hệ | Giải thích |
+|---|---|
+| `User` → `ChargingSession` | Một người dùng có thể sạc nhiều lần |
+| `ChargingStation` → `ChargingPoint` | Một trạm có nhiều điểm sạc |
+| `Station` → `MaintenanceSchedule` | Một trạm có nhiều lịch bảo trì |
+
+### 6.5 Các quan hệ Many-to-Many (N-N)
+
+**Ví dụ: Station và ElectricitySupplier**
+
+```
+Station (N) ────── (N) Supplier
+                          │
+                    (Bảng trung gian)
+                    StationElectricityContract
+```
+
+**Giải thích:**
+- Một trạm có thể ký hợp đồng với **nhiều nhà cung cấp điện** (đổi nhà cung cấp)
+- Một nhà cung cấp có thể phục vụ **nhiều trạm**
+
+**Bảng trung gian** `StationElectricityContract` chứa:
+- `StationID` + `SupplierID` (khóa chính ghép)
+- `ContractNumber`, `UnitPricePerKWh`, `ContractFrom`, `ContractTo`
+- `IsActive` — hợp đồng nào đang có hiệu lực
+
+**Tại sao cần bảng trung gian?** Vì không thể đặt Foreign Key trực tiếp — một bảng chỉ có một cột, không thể chứa nhiều nhà cung cấp.
+
+### 6.6 Foreign Key bảo vệ dữ liệu như thế nào?
+
+Foreign Key giống như "dây xích" giữa các bảng.
+
+**Ví dụ:** Khi có Foreign Key từ `ChargingSession.UserID` → `User.UserID`:
+
+| Tình huống | Foreign Key làm gì? |
+|---|---|
+| Bạn thêm phiên sạc với `UserID = 999` (không tồn tại) | **Chặn lại** — không có user nào mang ID 999 |
+| Bạn xóa User có `UserID = 1` (đang có phiên sạc) | **Chặn lại** — không thể xóa user đang có dữ liệu |
+| Bạn sửa `UserID` từ 1 thành 2 | **Chặn lại** — khóa chính không được sửa nếu có tham chiếu |
+
+Đây là lý do hệ thống không dùng `ON DELETE CASCADE` (tự động xóa theo) — vì rất nguy hiểm.
+
+### 6.7 Chuyện gì xảy ra nếu xóa dữ liệu?
+
+| Hành động | Hệ thống phản ứng thế nào |
+|---|---|
+| Xóa ChargingStation đang có Point | **Bị chặn** bởi Foreign Key |
+| Xóa User đang có Session | **Bị chặn** bởi Foreign Key |
+| "Xóa" User | Dùng **Soft Delete**: đánh dấu `IsDeleted = 1`, không xóa thật |
+| Buộc phải xóa? | Xóa từ "lá" vào "gốc": xóa Session → xóa Point → xóa Station |
+
+---
+
+## 7. Luồng Dữ Liệu Thực Tế
+
+### 7.1 Flow 1: Người dùng đặt lịch sạc (Booking)
+
+> **Kịch bản:** Chị Mai mở app, tìm trạm gần nhà, chọn giờ, đặt trước.
+
+```
+Bước 1: Chị Mai mở app → Xem danh sách trạm
+        - Frontend gọi API: GET /stations?lat=...&lng=...
+        - Backend query bảng ChargingStation (vị trí, trạng thái)
+        - Trả về danh sách trạm kèm điểm sạc còn trống
+
+Bước 2: Chị Mai chọn trạm → Chọn giờ → Nhấn "Đặt lịch"
+        - Frontend gọi API: POST /bookings
+        - Backend kiểm tra:
+            □ Tài khoản còn hoạt động không?
+            □ Điểm sạc còn trống vào giờ đó không?
+        - Backend INSERT vào bảng Booking:
+            UserID = 5, PointID = 12, ScheduledTime = "2026-05-11 14:00"
+        - Backend trả về: "Đặt lịch thành công!"
+        - Realtime gửi thông báo đến chủ trạm: "Có lịch đặt mới"
+
+Bước 3: Đến giờ hẹn, Chị Mai đến trạm
+        - Quét mã QR hoặc nhập mã đặt lịch
+        - Backend kiểm tra Booking, chuyển trạng thái thành "Đang sử dụng"
+```
+
+**Bảng nào thay đổi?**
+- `Booking`: INSERT dòng mới
+- `ChargingPoint`: (sau khi bắt đầu) UPDATE PointStatus = 'Busy'
+
+**Realtime event nào?**
+- `booking.created` → gửi đến chủ franchise
+- `point.status_changed` → gửi đến mọi người đang xem trạm đó
+
+### 7.2 Flow 2: Bắt đầu phiên sạc (Charging)
+
+> **Kịch bản:** Anh Tèo đến trạm, cắm sạc, bắt đầu sạc.
+
+```
+Bước 1: Anh Tèo chọn điểm sạc → Nhấn "Bắt đầu sạc"
+        - Frontend gọi API: POST /sessions/start
+        - Backend gọi stored procedure: sp_StartChargingSession
+            {
+              @UserID = 10,
+              @PointID = 15,
+              @VehicleID = 3,
+              @Source = 'MobileApp'
+            }
+
+Bước 2: sp_StartChargingSession kiểm tra:
+        □ UserID 10 có Active không? (User.AccountStatus)
+        □ PointID 15 có Available không? (ChargingPoint.PointStatus)
+        □ Chọn PricingPolicy phù hợp (tự động theo giờ, ngày)
+
+Bước 3: BEGIN TRANSACTION
+        - INSERT ChargingSession (StartTime = now, Status = 'Charging')
+        - UPDATE ChargingPoint SET PointStatus = 'Busy'
+        - INSERT SessionStatusHistory (trạng thái: 'Started')
+        COMMIT
+
+Bước 4: Backend trả về SessionCode cho app
+        - App hiển thị: "Đang sạc... 15.2kW | 30% pin"
+```
+
+**Bảng nào thay đổi?**
+- `ChargingSession`: INSERT — tạo phiên sạc mới
+- `ChargingPoint`: UPDATE — đánh dấu đang bận
+- `SessionStatusHistory`: INSERT — ghi lại lịch sử
+
+**Realtime event nào?**
+- `session.started` → gửi cho chủ trạm
+- `point.busy` → gửi cho những ai đang xem điểm sạc đó
+- `dashboard.update` → dashboard tự động cập nhật số liệu
+
+### 7.3 Flow 3: Kết thúc phiên sạc và tính tiền
+
+> **Kịch bản:** Xe của Anh Tèo đã sạc đầy, hệ thống tự động kết thúc.
+
+```
+Bước 1: Hệ thống (hoặc người dùng) gọi kết thúc sạc
+        - Backend gọi sp_EndChargingSession
+            {
+              @SessionID = 101,
+              @MeterEnd = 45.5,
+              @EndBatteryPercent = 100,
+              @StopReason = 'Completed'
+            }
+
+Bước 2: sp_EndChargingSession tính toán:
+        - TotalKWh = MeterEnd - MeterStart
+        - ChargingDurationMinutes = EndTime - StartTime
+        - AveragePowerKW = TotalKWh / (DurationMinutes / 60)
+        - CostTotal = fn_CalculateChargingCost(
+            TotalKWh, BasePrice, Discount, StartTime
+          )
+
+Bước 3: BEGIN TRANSACTION
+        - UPDATE ChargingSession (đầy đủ thông tin, Status = 'Completed')
+        - UPDATE ChargingPoint SET PointStatus = 'Available'
+        - INSERT SessionStatusHistory (trạng thái: 'Completed')
+        COMMIT
+
+Bước 4: Tự động gọi sp_CreatePayment
+        - Tạo Transaction (Amount = CostTotal)
+        - Nếu đủ tiền trong Wallet: trừ tiền
+        - Nếu không: chuyển sang phương thức khác
+```
+
+**Bảng nào thay đổi?**
+- `ChargingSession`: UPDATE 17+ cột
+- `ChargingPoint`: UPDATE — trả về trạng thái rảnh
+- `Transaction`: INSERT
+- `Wallet`: UPDATE (trừ tiền)
+- `WalletTransaction`: INSERT (ghi sổ)
+- `SessionStatusHistory`: INSERT
+
+**Realtime event nào?**
+- `session.completed` → gửi cho người dùng (kèm hóa đơn)
+- `point.available` → gửi cho những ai đang chờ
+- `wallet.balance_changed` → app tự cập nhật số dư
+- `dashboard.update` → KPI được cập nhật
+
+### 7.4 Flow 4: Dashboard analytics update
+
+> **Kịch bản:** Sau mỗi phiên sạc, dashboard cập nhật số liệu.
+
+```
+Bước 1: Khi ChargingSession được INSERT/UPDATE,
+        trigger trg_ChargingSession_StatusChange tự động chạy
+
+Bước 2: Trigger ghi vào SessionStatusHistory
+
+Bước 3: Cuối ngày, SQL Agent Job chạy sp_DailyKPIAggregation
+        - Tổng hợp dữ liệu từ ChargingSession
+        - UPSERT vào DailyStationKPI:
+            TotalSessions += 1
+            TotalKWh += 45.5
+            TotalRevenue += 159,250đ
+        - UPSERT vào DailyFranchiseKPI:
+            CommissionAmount = TotalRevenue × ShareRate
+
+Bước 4: Dashboard đọc từ:
+        - DailyStationKPI: "Hôm nay trạm có 12 phiên sạc"
+        - ivw_MonthlyRevenueSummary: "Tháng này doanh thu 450 triệu"
+        - vw_PeakHourAnalysis: "Giờ cao điểm: 17h-19h"
+```
+
+### 7.5 Flow 5: Xử lý hoàn tiền (Refund)
+
+> **Kịch bản:** Trạm sạc bị lỗi giữa chừng, Anh Tèo yêu cầu hoàn tiền.
+
+```
+Bước 1: Anh Tèo gửi yêu cầu hoàn tiền
+        - Frontend gọi API: POST /refunds
+        - Backend gọi sp_ProcessRefund(@OriginalTransactionID, @Amount)
+
+Bước 2: sp_ProcessRefund kiểm tra:
+        □ Giao dịch gốc có tồn tại? Completed?
+        □ Số tiền hoàn có vượt quá số tiền gốc không?
+        □ Đã hoàn bao nhiêu lần rồi? (tránh hoàn quá nhiều)
+
+Bước 3: BEGIN TRANSACTION
+        - INSERT RefundTransaction
+        - UPDATE Transaction SET Status = 'PartiallyRefunded'
+        - Nếu hoàn vào Wallet: UPDATE Wallet.Balance += Amount
+        COMMIT
 ```
 
 ---
 
-**Tài liệu được tạo bởi:** Database Architect & Enterprise Data Engineering Team
+## 8. Giải Thích Realtime System
+
+### 8.1 Realtime là gì?
+
+**Realtime** (thời gian thực) nghĩa là **ngay lập tức** — không có độ trễ.
+
+**Ví dụ:**
+- Bạn nhắn tin Facebook → bạn bè thấy **ngay** (không cần refresh)
+- Bạn sạc xe → số dư ví trong app giảm **ngay** (không cần refresh)
+- Dashboard doanh thu tăng lên **ngay** khi có phiên sạc mới
+
+### 8.2 Tại sao cần realtime?
+
+Nếu không có realtime:
+
+| Tình huống | Không realtime | Có realtime |
+|---|---|---|
+| Xem trạm còn trống | Phải refresh trang mỗi lần | Tự động cập nhật khi có thay đổi |
+| Kiểm tra số dư ví | Phải thoát ra vào lại | Tự động giảm khi thanh toán |
+| Nhận thông báo | Phải kiểm tra thủ công | Popup xuất hiện ngay lập tức |
+| Dashboard | Số liệu cũ | Số liệu live |
+
+### 8.3 Socket.IO là gì?
+
+**Socket.IO** là một thư viện giúp tạo kết nối **hai chiều, thời gian thực** giữa Frontend và Backend.
+
+**Cách hoạt động:**
+
+```
+KHÔNG có Socket.IO (cách cũ):
+Frontend: "Máy chủ ơi, trạm số 5 còn trống không?"
+Backend:  "Còn trống."
+  (5 giây sau)
+Frontend: "Máy chủ ơi, trạm số 5 còn trống không?"
+Backend:  "Còn trống."  ← Cùng câu hỏi, cùng câu trả lời → tốn tài nguyên
+  (5 giây sau)
+Frontend: "Máy chủ ơi, trạm số 5 còn trống không?"
+Backend:  "Hết trống rồi." ← Mất 10 giây mới biết!
+
+CÓ Socket.IO (cách mới):
+Frontend: "Máy chủ ơi, cho tôi vào phòng 'station:5'"
+Backend:  "OK, khi có thay đổi tôi sẽ báo bạn."
+
+... (người khác bắt đầu sạc ở trạm 5)
+Backend:  "Chú ý! Trạm 5 vừa hết trống!"
+Frontend: "Cảm ơn, tôi cập nhật ngay." ← Tức thời!
+```
+
+### 8.4 WebSocket Room hoạt động ra sao?
+
+**Room** (phòng) là kênh giao tiếp riêng cho từng nhóm người dùng.
+
+Ví dụ các "phòng" trong hệ thống:
+
+| Room | Ai ở trong? | Nhận thông báo gì? |
+|---|---|---|
+| `station:{StationID}` | Người đang xem trạm đó | Trạng thái point thay đổi |
+| `franchise:{FranchiseID}` | Chủ franchise đó | Doanh thu mới, bảo trì, cảnh báo |
+| `user:{UserID}` | Chính người dùng đó | Số dư ví, thông báo cá nhân |
+| `dashboard:admin` | Admin | Số liệu tổng quan |
+
+**Ví dụ: Khi một point thay đổi trạng thái**
+
+```
+1. PointID 15 vừa chuyển từ Available → Busy
+2. Backend phát hiện (qua trigger hoặc SP)
+3. Backend emit event: io.to('station:5').emit('point.status_changed', {
+     pointId: 15,
+     newStatus: 'Busy'
+   })
+4. Tất cả người dùng trong room 'station:5'
+   (đang xem trạm 5) nhận được thông báo
+5. App tự động cập nhật giao diện:
+   "Điểm sạc 15: 🟡 Đang bận"
+```
+
+### 8.5 Bảng nào liên quan đến realtime?
+
+| Bảng | Khi thay đổi → | Gửi realtime event |
+|---|---|---|
+| `ChargingPoint` | PointStatus đổi | `point.status_changed` |
+| `ChargingSession` | Session mới / kết thúc | `session.started`, `session.completed` |
+| `Wallet` | Số dư thay đổi | `wallet.balance_changed` |
+| `Alert` | Cảnh báo mới | `alert.new` |
+| `Notification` | Thông báo mới | `notification.new` |
+
+---
+
+## 9. Giải Thích Analytics & Dashboard
+
+### 9.1 Dashboard là gì?
+
+**Dashboard** là bảng điều khiển hiển thị các **chỉ số quan trọng** (KPI) dưới dạng biểu đồ, số liệu, bảng biểu.
+
+**Ví dụ dashboard của chủ franchise:**
+
+```
+┌─────────────────────────────────────────────────────┐
+│  DASHBOARD - Trạm sạc Bến Thành                     │
+├──────────────────────┬──────────────────────────────┤
+│  📊 Hôm nay          │  📈 Doanh thu tháng này       │
+│  Phiên sạc: 12      │  45.000.000₫                 │
+│  kWh: 450.5        │  Tăng 15% so với tháng trước │
+│  Doanh thu: 1.5M₫  │                              │
+├──────────────────────┼──────────────────────────────┤
+│  🔴 Trạm đang hoạt động │  ⚡ Giờ cao điểm            │
+│  4/6 Online           │  17h-19h (30% doanh thu)   │
+│  2/6 Đang sạc         │                            │
+└──────────────────────┴──────────────────────────────┘
+```
+
+### 9.2 Dashboard lấy dữ liệu từ đâu?
+
+Dashboard không đọc trực tiếp từ bảng gốc (như `ChargingSession`) vì:
+- Bảng gốc có **hàng triệu dòng** — query sẽ rất chậm
+- Cần tính toán tổng hợp (SUM, COUNT, AVG) — tốn thời gian
+
+Thay vào đó, dashboard đọc từ:
+
+```
+Bảng gốc                          Bảng Analytics
+(ChargingSession)                 (DailyStationKPI)
+                                    
+100 triệu dòng        ETL ────→   365 dòng (mỗi ngày 1 dòng)
+(Từng phiên sạc)      (Chạy       (Tổng hợp theo ngày)
+                      cuối ngày)   
+
+Query: 4 phút                     Query: 0.01 giây
+```
+
+### 9.3 Stored Procedure là gì?
+
+**Stored Procedure** (SP) là một "chương trình con" chạy trong database.
+
+Giống như **công thức nấu ăn**:
+- Bạn đưa nguyên liệu (tham số)
+- Database làm theo các bước đã định sẵn
+- Trả ra kết quả
+
+**Ví dụ:** `sp_StartChargingSession` giống như công thức:
+
+```
+sp_StartChargingSession(@UserID, @PointID, @VehicleID):
+  1. Kiểm tra user còn active không
+  2. Kiểm tra point còn available không
+  3. Chọn pricing policy phù hợp
+  4. Tạo phiên sạc mới
+  5. Đánh dấu point là busy
+  6. Ghi lịch sử
+  7. Trả về SessionCode
+```
+
+**Lợi ích:**
+- **An toàn:** Ngăn SQL injection (tấn công database)
+- **Nhanh:** Đã được biên dịch sẵn
+- **Nhất quán:** Mọi nơi đều gọi cùng một SP
+
+### 9.4 Indexed View (Materialized View) là gì?
+
+**View** (khung nhìn) giống như một "cửa sổ" nhìn vào dữ liệu.
+
+**View thường:** Mỗi lần bạn nhìn, database phải tính toán lại.
+**Indexed View:** Kết quả được **lưu sẵn** như một bảng thật.
+
+**Ví dụ:** `ivw_MonthlyRevenueSummary`
+
+```
+View này hiển thị:
+Tháng 1/2026, Trạm 1: 150 phiên, 5,000 kWh, 17.5 triệu
+Tháng 1/2026, Trạm 2: 200 phiên, 7,500 kWh, 26.25 triệu
+...
+
+Khi có phiên sạc mới → View tự động cập nhật
+Khi dashboard hỏi → Trả về ngay lập tức (không tính toán lại)
+```
+
+### 9.5 Analytics Pipeline
+
+```
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│   Bảng gốc       │     │   ETL Process    │     │   Bảng KPI      │
+│  (OLTP)          │────→│  (sp_DailyKPI    │────→│  (Analytics)    │
+│                  │     │   Aggregation)   │     │                  │
+│ ChargingSession  │     │  Chạy cuối ngày │     │ DailyStationKPI │
+│ Transaction      │     │  MERGE upsert   │     │ DailyFranchiseKPI│
+│ PointTelemetry   │     │  Tổng hợp số    │     │ HourlySessionAgg│
+└──────────────────┘     └──────────────────┘     └──────────────────┘
+                                                            │
+                                                            ▼
+                                                   ┌──────────────────┐
+                                                   │   Dashboard     │
+                                                   │   & Báo cáo    │
+                                                   │   (Đọc nhanh)  │
+                                                   └──────────────────┘
+```
+
+### 9.6 Các business metrics quan trọng
+
+| Chỉ số | Giải thích | Công thức |
+|---|---|---|
+| **Doanh thu (Revenue)** | Tổng tiền từ các phiên sạc | `SUM(CostTotal)` |
+| **Giờ cao điểm (Peak Hour)** | Giờ nào có nhiều phiên sạc nhất | `COUNT(SessionID) GROUP BY Hour` |
+| **Tỷ lệ sử dụng trạm (Utilization)** | Trạm được dùng bao nhiêu % thời gian | `(Thời gian có xe sạc / Tổng thời gian) × 100` |
+| **Hiệu suất Franchise** | Franchise nào hoạt động tốt nhất | Doanh thu, số phiên, số trạm active |
+| **Chi phí điện năng** | Tiền điện phải trả vs tiền thu được | `TotalRevenue - (KWh × Giá điện)` |
+| **Thời gian hoạt động (Uptime)** | Trạm online được bao nhiêu % | `(Thời gian online / Tổng thời gian) × 100` |
+
+### 9.7 Bảng analytics tổng hợp
+
+**DailyStationKPI — KPI hàng ngày theo từng trạm:**
+
+| Cột | Giải thích |
+|---|---|
+| `StationID` | Trạm nào |
+| `RecordDate` | Ngày nào |
+| `TotalSessions` | Tổng số phiên sạc trong ngày |
+| `TotalKWh` | Tổng số điện đã sạc |
+| `TotalRevenue` | Tổng doanh thu |
+| `AvgPowerKW` | Công suất trung bình |
+| `AvgChargingMinutes` | Thời gian sạc trung bình (phút) |
+| `PeakConcurrentSessions` | Số phiên đồng thời cao nhất |
+| `UniqueUsers` | Số người dùng khác nhau |
+| `UptimePercent` | % thời gian trạm hoạt động |
+
+---
+
+## 10. Enterprise Features (Tính Năng Doanh Nghiệp)
+
+### 10.1 Audit Log (Nhật ký kiểm toán)
+
+**Là gì?** Ghi lại **mọi thay đổi** trong hệ thống — ai, làm gì, lúc nào, giá trị cũ, giá trị mới.
+
+**Tại sao cần?**
+- **Khiếu nại:** Khách nói "Tôi bị trừ tiền oan" → tra audit để kiểm tra
+- **Điều tra:** Ai đã sửa giá điện lúc nửa đêm?
+- **Tuân thủ pháp luật:** Cơ quan thuế yêu cầu cung cấp lịch sử giao dịch
+
+**Nếu không có audit log:**
+- Khi có sai sót, không biết ai đã gây ra
+- Không thể chứng minh hệ thống hoạt động đúng
+- Rủi ro pháp lý cao
+
+### 10.2 Soft Delete (Xóa mềm)
+
+**Là gì?** Khi "xóa" dữ liệu, hệ thống không xóa thật mà chỉ **đánh dấu** là đã xóa.
+
+```sql
+-- Không phải:
+DELETE FROM User WHERE UserID = 5;
+
+-- Mà là:
+UPDATE User SET IsDeleted = 1, DeletedAt = SYSDATETIME() WHERE UserID = 5;
+```
+
+**Tại sao cần?**
+- **Phục hồi:** Xóa nhầm? Chỉ cần sửa `IsDeleted = 0`
+- **Toàn vẹn:** Các bảng liên quan (Session, Transaction) vẫn hoạt động
+- **Lịch sử:** Báo cáo doanh thu vẫn tính cả dữ liệu cũ
+
+**Nếu không có soft delete:**
+- Xóa user → mất toàn bộ lịch sử sạc của user đó
+- Báo cáo doanh thu sẽ sai (thiếu dữ liệu cũ)
+- Foreign Key sẽ chặn xóa (không xóa được)
+
+### 10.3 Transactions (Giao dịch)
+
+**Là gì?** Một nhóm thao tác database **hoặc làm tất cả, hoặc không làm gì cả**.
+
+**Ví dụ:** Khi bắt đầu sạc, cần:
+1. Tạo phiên sạc mới (INSERT)
+2. Cập nhật điểm sạc (UPDATE)
+3. Ghi lịch sử (INSERT)
+
+Nếu bước 2 thất bại, bước 1 không được giữ lại → **ROLLBACK**.
+
+```text
+BEGIN TRANSACTION
+    INSERT ChargingSession ...    ──┐
+    UPDATE ChargingPoint ...      ──┤── Nếu 1 cái lỗi → Tất cả đều hủy
+    INSERT StatusHistory ...      ──┘
+COMMIT
+```
+
+**Nếu không có transaction:**
+- Bước 1 thành công, bước 2 thất bại → có phiên sạc "ma" (không point nào bận)
+- Dữ liệu không nhất quán
+
+### 10.4 Rollback (Khôi phục)
+
+**Là gì?** Khi có lỗi, database tự động "quay lại" trạng thái trước khi thay đổi.
+
+Hệ thống sử dụng `SET XACT_ABORT ON` — tự động rollback khi có bất kỳ lỗi nào.
+
+### 10.5 RBAC (Role-Based Access Control)
+
+**Là gì?** Phân quyền dựa trên **vai trò** — không phân quyền cho từng người riêng lẻ.
+
+**Cách hoạt động:**
+```
+Người dùng → Có vai trò → Vai trò có quyền → Quyền cho phép hành động
+
+Ví dụ:
+Anh Tèo → FranchiseOwner → SESSION_READ, PAYMENT_READ, ... → Chỉ xem được trạm của mình
+```
+
+**Bảng liên quan:**
+- `Role`: Danh sách vai trò (SysAdmin, Operator, Customer, ...)
+- `Permission`: Danh sách quyền (SESSION_START, PAYMENT_REFUND, ...)
+- `RolePermission`: Vai trò nào có quyền nào
+- `UserRole`: Người dùng nào có vai trò nào
+
+### 10.6 Row-Level Security (RLS)
+
+**Là gì?** Tự động **lọc dữ liệu** dựa trên người dùng — ngay cả khi họ chạy cùng một câu query.
+
+**Ví dụ:**
+- Chủ franchise A chạy: `SELECT * FROM ChargingStation` → Chỉ thấy trạm của mình
+- Chủ franchise B chạy: `SELECT * FROM ChargingStation` → Chỉ thấy trạm của mình
+- Admin chạy: `SELECT * FROM ChargingStation` → Thấy tất cả
+
+**Nếu không có RLS:**
+- Chủ franchise A có thể xem doanh thu của franchise B
+- Rủi ro lộ thông tin kinh doanh
+
+### 10.7 Monitoring (Giám sát)
+
+**Là gì?** Hệ thống tự động theo dõi tình trạng hoạt động.
+
+**Hệ thống giám sát:**
+- **Heartbeat:** Mỗi 30 giây, trạm sạc gửi tín hiệu "tôi còn sống"
+- **Telemetry:** Mỗi 5-15 giây, cảm biến ghi lại điện áp, dòng điện, nhiệt độ
+- **Alert:** Nếu nhiệt độ > 60°C → tự động tạo cảnh báo
+
+### 10.8 Health Checks (Kiểm tra sức khỏe)
+
+**Là gì?** Hệ thống tự kiểm tra xem mọi thứ có hoạt động tốt không.
+
+**Ví dụ:**
+- Database có còn kết nối được không?
+- Realtime có còn gửi được event không?
+- Backup gần nhất đã chạy thành công chưa?
+
+### 10.9 Migration System
+
+**Là gì?** Hệ thống quản lý các thay đổi cấu trúc database theo thời gian.
+
+Khi cần thêm cột mới, không sửa trực tiếp mà tạo một file migration riêng. Điều này giúp:
+- Mọi thay đổi đều có lịch sử
+- Có thể rollback nếu cần
+- Đồng bộ giữa các môi trường (dev, test, production)
+
+---
+
+## 11. Các Tính Năng SQL Server Được Sử Dụng
+
+### 11.1 Stored Procedures
+
+**Giải thích đơn giản:** Một "chương trình con" chạy trong database.
+
+**Business Value:**
+- **An toàn:** Chỉ gọi SP, không chạy SQL trực tiếp → chống SQL injection
+- **Nhanh:** SP được biên dịch sẵn, database không phải "dịch" lại mỗi lần
+- **Nhất quán:** Cùng một logic, gọi từ nhiều nơi, không sợ sai lệch
+
+**Ví dụ trong hệ thống:**
+
+| SP | Việc nó làm |
+|---|---|
+| `sp_StartChargingSession` | Kiểm tra + tạo phiên sạc + cập nhật trạng thái |
+| `sp_EndChargingSession` | Tính tiền + kết thúc phiên + trả point |
+| `sp_CreatePayment` | Xử lý thanh toán + cập nhật ví |
+| `sp_ProcessRefund` | Xử lý hoàn tiền |
+| `sp_DailyKPIAggregation` | Tổng hợp KPI cuối ngày |
+
+### 11.2 Functions (Hàm)
+
+**Giải thích đơn giản:** Giống SP nhưng **trả về một giá trị** (giống công thức toán học).
+
+**Business Value:**
+- **Tái sử dụng:** Cùng một hàm tính tiền, dùng ở nhiều chỗ
+- **Nhất quán:** Giá luôn được tính cùng một cách
+- **Dễ bảo trì:** Sửa một chỗ, ảnh hưởng tất cả
+
+**Ví dụ trong hệ thống:**
+
+| Function | Việc nó làm |
+|---|---|
+| `fn_CalculateChargingCost` | Tính tiền sạc (có tính giờ cao điểm, giảm giá) |
+| `fn_GetEffectivePrice` | Tính giá hiệu quả sau tất cả quy tắc |
+| `fn_GetStationUtilizationRate` | Tính tỷ lệ sử dụng trạm |
+| `fn_GetFranchiseCommission` | Tính hoa hồng cho franchise |
+
+### 11.3 Triggers (Bộ kích hoạt)
+
+**Giải thích đơn giản:** Một đoạn code **tự động chạy** khi có sự kiện (INSERT, UPDATE, DELETE).
+
+Giống như: "Khi có người bước vào cửa → chuông reo tự động."
+
+**Business Value:**
+- **Tự động hóa:** Không cần code backend, database tự làm
+- **Bảo vệ dữ liệu:** Chặn sửa/xóa dữ liệu quan trọng
+- **Đồng bộ:** Tự động cập nhật bảng liên quan
+
+**Ví dụ trong hệ thống:**
+
+| Trigger | Khi nào chạy? | Làm gì? |
+|---|---|---|
+| `trg_ChargingPoint_StatusChange` | Sau khi UPDATE ChargingPoint | Ghi lịch sử trạng thái |
+| `trg_ChargingSession_PointSync` | Sau khi INSERT/UPDATE Session | Đồng bộ PointStatus (dự phòng) |
+| `trg_Transaction_Immutable` | Khi UPDATE Transaction | Chặn sửa giao dịch đã hoàn thành |
+| `trg_AuditLog_Immutable` | Khi DELETE/UPDATE AuditLog | **Chặn hoàn toàn** — audit không thể xóa |
+
+### 11.4 Indexed Views (Khung nhìn được đánh chỉ mục)
+
+**Giải thích đơn giản:** Một "bảng ảo" được lưu sẵn trên đĩa, tự động cập nhật.
+
+**Business Value:**
+- **Tốc độ:** Query báo cáo chạy nhanh 100-1000 lần so với query thường
+- **Tự động:** Không cần ETL riêng, dữ liệu luôn mới
+
+**Ví dụ:**
+- `ivw_MonthlyRevenueSummary` — Doanh thu theo tháng, được lưu sẵn
+- `ivw_DailyStationAvailability` — Tình trạng trạm, được lưu sẵn
+
+### 11.5 Transactions & ACID
+
+**Giải thích đơn giản:** Đảm bảo các thao tác database hoặc **làm hết** hoặc **không làm gì**.
+
+**ACID là 4 đảm bảo:**
+
+| Tính chất | Giải thích | Ví dụ |
+|---|---|---|
+| **Atomicity** | Tất cả hoặc không gì cả | Chuyển tiền: cả trừ và cộng đều phải thành công |
+| **Consistency** | Dữ liệu luôn hợp lệ | Số dư ví không thể âm |
+| **Isolation** | Giao dịch song song không ảnh hưởng nhau | Hai người cùng sạc không làm sai số liệu |
+| **Durability** | Khi commit là dữ liệu được lưu vĩnh viễn | Mất điện cũng không mất giao dịch |
+
+### 11.6 Constraints (Ràng buộc)
+
+**Giải thích đơn giản:** Các "luật lệ" database tự động kiểm tra.
+
+| Loại | Ví dụ | Chặn gì? |
+|---|---|---|
+| **CHECK** | `Balance >= 0` | Không cho ví âm tiền |
+| **UNIQUE** | `StationCode` phải duy nhất | Không cho 2 trạm cùng mã |
+| **FOREIGN KEY** | `UserID` phải tồn tại trong `User` | Không cho session của user ảo |
+| **DEFAULT** | `CreatedAt = SYSDATETIME()` | Tự động ghi ngày tạo |
+
+### 11.7 Indexes (Chỉ mục)
+
+**Giải thích đơn giản:** Giống như **mục lục sách** — giúp tìm dữ liệu nhanh hơn.
+
+- Không có index: Đọc từng dòng một để tìm (giống đọc cả cuốn sách)
+- Có index: Nhảy thẳng đến dòng cần tìm (giống tra mục lục)
+
+**Các loại index trong hệ thống:**
+
+| Loại | Giải thích | Ví dụ |
+|---|---|---|
+| **Clustered** | Dữ liệu được sắp xếp vật lý | Mặc định trên khóa chính |
+| **Nonclustered** | Bảng tra riêng, trỏ đến dữ liệu | Index trên UserID, SessionStatus |
+| **Covering** | Index chứa đủ mọi cột cần query | Không cần đọc bảng gốc |
+| **Filtered** | Chỉ index một phần dữ liệu | Chỉ index session đã hoàn thành |
+| **Columnstore** | Nén dữ liệu theo cột | Cho analytics siêu nhanh |
+
+### 11.8 Analytics Queries (Truy vấn phân tích)
+
+**Giải thích đơn giản:** Các câu hỏi phức tạp để lấy thông tin tổng hợp.
+
+**Ví dụ:**
+```sql
+-- "Tháng này doanh thu bao nhiêu?"
+SELECT SUM(CostTotal) FROM ChargingSession
+WHERE StartTime >= '2026-05-01' AND StartTime < '2026-06-01'
+  AND SessionStatus = 'Completed'
+```
+
+```sql
+-- "Giờ nào cao điểm nhất?"
+SELECT DATEPART(HOUR, StartTime) AS Hour, COUNT(*) AS SessionCount
+FROM ChargingSession
+GROUP BY DATEPART(HOUR, StartTime)
+ORDER BY SessionCount DESC
+```
+
+---
+
+## 12. Các Vấn Đề Database Thực Tế
+
+### 12.1 Orphan Records (Bản ghi mồ côi)
+
+**Vấn đề là gì?** Dữ liệu ở bảng con tham chiếu đến bảng cha đã không còn tồn tại.
+
+**Ví dụ:**
+- Một `ChargingSession` có `UserID = 5`, nhưng `User` có `UserID = 5` đã bị xóa
+- "Phiên sạc mồ côi" — không biết của ai
+
+**Tại sao nguy hiểm?**
+- Báo cáo không chính xác
+- Không thể tra cứu thông tin người dùng
+- Lỗi khi JOIN bảng
+
+**Hệ thống xử lý thế nào?**
+- **Foreign Key:** Chặn xóa User nếu còn Session
+- **Soft Delete:** Không xóa thật, chỉ đánh dấu
+- **SET NULL:** Một số bảng cho phép FK = NULL nếu bảng cha bị xóa
+
+### 12.2 Duplicate Data (Dữ liệu trùng lặp)
+
+**Vấn đề là gì?** Cùng một thông tin xuất hiện ở nhiều chỗ.
+
+**Ví dụ:**
+- Cùng một email nhưng có 2 tài khoản
+- Cùng một phiên sạc nhưng có 2 giao dịch thanh toán
+
+**Tại sao nguy hiểm?**
+- Doanh thu bị tính sai (tính 2 lần)
+- Khó xác định đâu là dữ liệu đúng
+
+**Hệ thống xử lý thế nào?**
+- **UNIQUE constraint:** Chặn email trùng, StationCode trùng
+- **CHECK trong SP:** `sp_CreatePayment` kiểm tra session chưa có transaction
+- **UNIQUE INDEX:** Trên các cột không được trùng
+
+### 12.3 Race Condition (Điều kiện tranh)
+
+**Vấn đề là gì?** Hai người cùng thao tác trên cùng dữ liệu cùng lúc.
+
+**Ví dụ:**
+- Người A và người B cùng nhấn "Bắt đầu sạc" ở cùng điểm sạc
+- Cả hai đều kiểm tra thấy "còn trống"
+- Cả hai đều được tạo session → 2 người cùng 1 điểm sạc!
+
+**Tại sao nguy hiểm?**
+- Một điểm sạc được "sạc đôi"
+- Dữ liệu không nhất quán
+- Mất tiền oan
+
+**Hệ thống xử lý thế nào?**
+- **Transaction:** Các thao tác trong cùng một giao dịch
+- **UPDLOCK:** Khóa dòng dữ liệu khi đọc để chống thay đổi
+- **Trigger dự phòng:** Double-check khi cập nhật PointStatus
+
+### 12.4 Deadlock (Khóa chết)
+
+**Vấn đề là gì?** Hai giao dịch chờ nhau giải phóng tài nguyên → không ai tiến lên được.
+
+**Ví dụ:**
+```
+Giao dịch A: Khóa Bảng 1 → Chờ Bảng 2
+Giao dịch B: Khóa Bảng 2 → Chờ Bảng 1
+→ Cả hai đều chờ mãi mãi!
+```
+
+**Tại sao nguy hiểm?**
+- Hệ thống bị treo
+- Người dùng không thể thao tác
+
+**Hệ thống xử lý thế nào?**
+- **Transaction ngắn:** Giải phóng khóa nhanh
+- **Thứ tự khóa nhất quán:** Luôn khóa bảng theo cùng một thứ tự
+- **SQL Server tự động phát hiện:** Chọn một giao dịch làm "nạn nhân" và rollback
+
+### 12.5 Stale Realtime State (Trạng thái realtime lỗi thời)
+
+**Vấn đề là gì?** Frontend hiển thị trạng thái khác với dữ liệu thực tế trong database.
+
+**Ví dụ:**
+- App hiển thị "Điểm sạc còn trống" nhưng thực tế đã có người sạc
+- Dashboard hiển thị số liệu cũ
+
+**Tại sao nguy hiểm?**
+- Người dùng đến trạm nhưng không sạc được
+- Quyết định sai dựa trên dữ liệu cũ
+
+**Hệ thống xử lý thế nào?**
+- **Realtime sync:** Socket.IO gửi cập nhật ngay khi có thay đổi
+- **Double-check:** Khi người dùng bắt đầu sạc, kiểm tra lại trạng thái từ database
+- **Heartbeat:** Frontend kiểm tra kết nối realtime còn hoạt động không
+
+### 12.6 Inconsistent Analytics (Dữ liệu phân tích không nhất quán)
+
+**Vấn đề là gì?** Số liệu giữa các báo cáo khác nhau.
+
+**Ví dụ:**
+- Dashboard hôm nay: "Doanh thu hôm qua: 50 triệu"
+- Báo cáo cuối tháng: "Doanh thu hôm qua: 48 triệu"
+- Cái nào đúng?
+
+**Tại sao nguy hiểm?**
+- Mất lòng tin vào hệ thống
+- Quyết định kinh doanh sai
+
+**Hệ thống xử lý thế nào?**
+- **Stored procedure tập trung:** Cùng một SP cho mọi tính toán
+- **Materialized view:** Dữ liệu được tính một lần, dùng nhiều nơi
+- **Timestamp:** Mọi báo cáo đều ghi rõ thời điểm tính
+
+---
+
+## 13. Tổng Kết Kiến Trúc
+
+### 13.1 Tổng quan toàn bộ hệ thống
+
+```
+                    ┌────────────────────────────────────────────┐
+                    │           NGƯỜI DÙNG                       │
+                    │  (App, Web, Dashboard, IoT Device)         │
+                    └──────────────────┬─────────────────────────┘
+                                       │
+                    ┌──────────────────▼─────────────────────────┐
+                    │              BACKEND (Node.js)             │
+                    │  ┌────────┐ ┌────────┐ ┌───────────────┐  │
+                    │  │Auth API│ │Business│ │Realtime Server│  │
+                    │  │        │ │  API   │ │(Socket.IO)    │  │
+                    │  └────────┘ └────────┘ └───────────────┘  │
+                    └──────────────────┬─────────────────────────┘
+                                       │
+                    ┌──────────────────▼─────────────────────────┐
+                    │         DATABASE (SQL Server 2022+)        │
+                    │                                           │
+                    │  ┌────────────┐ ┌────────────┐          │
+                    │  │  OLTP     │ │   OLAP     │          │
+                    │  │  (Giao dịch)│ │  (Phân tích)│          │
+                    │  │            │ │            │          │
+                    │  │ Users     │ │ DailyKPI   │          │
+                    │  │ Operations│ │ MonthlyRev │          │
+                    │  │ Payments  │ │ HourlyAgg  │          │
+                    │  │ Monitoring│ │  ...       │          │
+                    │  │ Infrastructure│ │            │          │
+                    │  └────────────┘ └────────────┘          │
+                    │                                           │
+                    │  ┌──────────────────────────────────┐    │
+                    │  │  Cross-cutting: Audit | Reporting │    │
+                    │  └──────────────────────────────────┘    │
+                    └───────────────────────────────────────────┘
+```
+
+### 13.2 Tại sao chọn kiến trúc database-centric?
+
+**Database-centric** nghĩa là database là **trung tâm** của hệ thống — mọi thứ xoay quanh nó.
+
+**Ưu điểm:**
+
+| Khía cạnh | Lợi ích |
+|---|---|
+| **Nhất quán** | Mọi dữ liệu tập trung một chỗ, không sợ lệch |
+| **An toàn** | Foreign Key, Constraints, Transactions bảo vệ dữ liệu |
+| **Truy vấn phức tạp** | SQL Server xử lý được các báo cáo phức tạp |
+| **Tích hợp** | Dễ kết nối với Power BI, Excel, các công cụ BI khác |
+| **ACID** | Đảm bảo giao dịch tài chính chính xác tuyệt đối |
+
+### 13.3 Ưu điểm của Realtime Architecture
+
+- **Trải nghiệm người dùng tốt hơn:** Thông tin luôn mới, không cần refresh
+- **Phát hiện sự cố nhanh:** Cảnh báo xuất hiện ngay lập tức
+- **Dashboard live:** Quản lý thấy số liệu thực tế, không bị trễ
+
+### 13.4 Ưu điểm của Analytics-First Design
+
+- **Dashboard nhanh:** Dữ liệu đã được tổng hợp sẵn, không cần tính toán lại
+- **Tiết kiệm tài nguyên:** Không query bảng gốc hàng triệu dòng
+- **History tracking:** Dữ liệu KPI được lưu theo ngày, có thể so sánh
+
+### 13.5 Scalability Considerations (Khả năng mở rộng)
+
+Khi hệ thống lớn lên (nhiều trạm hơn, nhiều người dùng hơn), có thể mở rộng bằng cách:
+
+| Chiến lược | Giải thích |
+|---|---|
+| **Partitioning** | Chia bảng lớn thành nhiều phần nhỏ hơn (theo tháng/năm) |
+| **Read Replicas** | Tạo bản sao database chỉ để đọc — giảm tải cho database chính |
+| **Columnstore** | Nén dữ liệu analytics — tăng tốc 10-100x |
+| **Archiving** | Chuyển dữ liệu cũ sang database riêng — giữ database chính nhẹ |
+| **Microservices** | Tách các module thành dịch vụ riêng biệt |
+
+### 13.6 Enterprise Considerations (Yếu tố doanh nghiệp)
+
+Hệ thống được thiết kế với tư duy doanh nghiệp:
+
+| Yếu tố | Giải pháp |
+|---|---|
+| **Bảo mật** | RBAC + RLS + Data Masking + Encryption |
+| **Kiểm toán** | AuditLog bất biến, StatusHistory chi tiết |
+| **Sẵn sàng** | Always On Availability Groups, backup strategy |
+| **Phục hồi** | Point-in-time recovery, soft delete |
+| **Tuân thủ** | GDPR-ready (tách PII), audit trail, immutable logs |
+| **Vận hành** | Monitoring, alerting, health checks |
+
+---
+
+## Phụ Lục: Bảng Tổng Hợp Các Module & Bảng Chính
+
+| Module | Bảng chính | Mục đích |
+|---|---|---|
+| **Users** | User, UserProfile, UserCredential, Vehicle | Quản lý người dùng & xe |
+| **Access** | Role, Permission, RolePermission | Phân quyền |
+| **Infrastructure** | ChargingStation, ChargingPoint, Address, Franchise | Hạ tầng vật lý |
+| **Operations** | ChargingSession, PricingPolicy, PricingRule | Vận hành cốt lõi |
+| **Payments** | Transaction, Wallet, Invoice, Refund | Tài chính |
+| **Monitoring** | PointTelemetry, Alert, ErrorLog | Giám sát IoT |
+| **Audit** | AuditLog, StatusHistory | Kiểm toán |
+| **Analytics** | DailyStationKPI, HourlySessionAgg | Phân tích KPI |
+| **Reporting** | vw_ActiveChargingSessions, vw_StationAvailability, ... | Báo cáo |
+
+---
+
+> **Tài liệu này được thiết kế cho tất cả mọi người — từ người mới bắt đầu đến chuyên gia.**
+> Nếu bạn đọc đến đây mà vẫn còn thắc mắc, hãy xem lại các phần:
+> - Phần 3 nếu bạn chưa rõ về database cơ bản
+> - Phần 4 nếu bạn muốn hiểu từng module
+> - Phần 7 nếu bạn muốn xem dữ liệu chạy thế nào
+> - Phần 8 nếu bạn muốn hiểu realtime
+
+---
+
 **Ngày tạo:** 2026
-**Phiên bản:** 2.0 (Enterprise Redesign)
+**Phiên bản:** 3.0 (Hướng dẫn cho người mới)
 **Môn học:** IE103 — Quản lý Thông tin

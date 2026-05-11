@@ -7,7 +7,7 @@ const {
 const PricingPolicyRepository = new BaseRepository('PricingPolicy', 'Operations', 'PolicyID', PricingPolicy);
 const ChargingSessionRepository = new BaseRepository('ChargingSession', 'Operations', 'SessionID', ChargingSession);
 const BookingRepository = new BaseRepository('Booking', 'Operations', 'BookingID', Booking);
-const MaintenanceScheduleRepository = new BaseRepository('MaintenanceSchedule', 'Operations', 'MaintenanceID', MaintenanceSchedule);
+const MaintenanceScheduleRepository = new BaseRepository('MaintenanceSchedule', 'Operations', 'ScheduleID', MaintenanceSchedule);
 const StationReviewRepository = new BaseRepository('StationReview', 'Operations', 'ReviewID', StationReview);
 
 module.exports = {

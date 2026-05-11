@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { api } from '../../services/api';
+import { useSocketEvent } from '../../lib/useSocket';
 import PageHeader from '../../components/ui/PageHeader';
 import StatusBadge from '../../components/ui/StatusBadge';
 import type { Notification } from '../../types';
@@ -10,13 +11,17 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = () => {
+  const load = useCallback(() => {
     api.get('/notifications/my').then(r => {
       setNotifications(Array.isArray(r.data) ? r.data : []);
     }).finally(() => setLoading(false));
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+
+  useSocketEvent('notification:new', (n: Notification) => {
+    setNotifications(prev => [n, ...prev]);
+  });
 
   const handleMarkRead = async (id: number) => {
     try {
@@ -55,12 +60,12 @@ export default function NotificationsPage() {
                   </div>
                   <div className="flex-1">
                     <p className={`font-medium ${n.IsRead ? 'text-slate-700' : 'text-slate-900'}`}>{n.Title}</p>
-                    <p className="text-sm text-slate-500 mt-1">{n.Message}</p>
+                    <p className="text-sm text-slate-500 mt-1">{n.Body}</p>
                     <p className="text-xs text-slate-400 mt-2">{new Date(n.CreatedAt || '').toLocaleString('vi-VN')}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 ml-4">
-                  <StatusBadge status={n.NotificationType} />
+                  <StatusBadge status={n.Type} />
                   {!n.IsRead && <CheckCheck className="w-4 h-4 text-blue-600" />}
                 </div>
               </div>

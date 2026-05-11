@@ -1,40 +1,46 @@
-const { query } = require('../config/database');
+const { execute } = require('../config/database');
 const { successResponse } = require('../utils/response');
+const socketService = require('./socketService');
 
 class NotificationService {
+  async create(userId, { Title, Body, Type, ReferenceType, ReferenceID }) {
+    const result = await execute('Users.sp_CreateNotification', {
+      UserID: userId, Title, Body, Type: Type || 'Info',
+      ReferenceType: ReferenceType || null, ReferenceID: ReferenceID || null,
+    });
+    const notification = result.recordset?.[0] || null;
+    if (notification) {
+      socketService.sendToUser(userId, 'notification:new', notification);
+    }
+    return notification;
+  }
+
   async getUserNotifications(userId, filters = {}) {
-    let q = `SELECT * FROM [Users].[Notification] WHERE UserID = @UserID`;
-    const params = { UserID: userId };
-    if (filters.isRead !== undefined) {
-      q += ` AND IsRead = @IsRead`;
-      params.IsRead = filters.isRead ? 1 : 0;
-    }
-    if (filters.type) {
-      q += ` AND NotificationType = @Type`;
-      params.Type = filters.type;
-    }
-    q += ` ORDER BY CreatedAt DESC`;
-    if (filters.page && filters.limit) {
-      const offset = (filters.page - 1) * filters.limit;
-      q += ` OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY`;
-      params.Offset = offset;
-      params.Limit = filters.limit;
-    }
-    const result = await query(q, params);
-    return successResponse(result.recordset);
+    const params = { UserID: userId, Page: filters.page || 1, Limit: filters.limit || 20 };
+    if (filters.isRead !== undefined) params.UnreadOnly = filters.isRead ? 0 : 1;
+    if (filters.type) params.Type = filters.type;
+
+    const result = await execute('Users.sp_GetUserNotifications', params);
+    return successResponse(result.recordsets[0] || []);
   }
 
   async markRead(notificationId, userId) {
-    const result = await query(`UPDATE [Users].[Notification] SET IsRead = 1, ReadAt = SYSDATETIME()
-      OUTPUT INSERTED.* WHERE NotificationID = @ID AND UserID = @UserID`,
-      { ID: notificationId, UserID: userId });
-    return successResponse(result.recordset[0] || null, 'Notification marked as read');
+    const result = await execute('Users.sp_MarkNotificationRead', {
+      NotificationID: notificationId, UserID: userId,
+    });
+    const updated = result.recordset?.[0] || null;
+    if (updated) {
+      socketService.sendToUser(userId, 'notification:read', updated);
+    }
+    return successResponse(updated, 'Notification marked as read');
   }
 
   async getUnreadCount(userId) {
-    const result = await query(`SELECT COUNT(*) AS Cnt FROM [Users].[Notification]
-      WHERE UserID = @UserID AND IsRead = 0`, { UserID: userId });
-    return successResponse({ unreadCount: result.recordset[0].Cnt });
+    const result = await execute('Users.sp_GetUserNotifications', {
+      UserID: userId, UnreadOnly: 1, Page: 1, Limit: 1,
+    });
+    const total = result.recordsets?.[1]?.[0]?.Total || 0;
+    return successResponse({ unreadCount: total });
   }
 }
 

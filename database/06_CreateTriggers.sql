@@ -30,28 +30,20 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    DECLARE @NotificationTitle NVARCHAR(200), @NotificationBody NVARCHAR(1000);
-
-    SELECT @NotificationTitle =
+    INSERT INTO Users.Notification (UserID, Title, Body, Type, ReferenceType, ReferenceID, CreatedAt)
+    SELECT i.UserID,
         CASE i.Status
             WHEN N'Confirmed' THEN N'Đặt lịch đã được xác nhận'
             WHEN N'Cancelled' THEN N'Đặt lịch đã bị hủy'
             WHEN N'Expired'   THEN N'Đặt lịch đã hết hạn'
             WHEN N'Completed' THEN N'Đặt lịch đã hoàn thành'
-            ELSE NULL
-        END;
-
-    IF @NotificationTitle IS NOT NULL
-    BEGIN
-        INSERT INTO Users.Notification (UserID, Title, Body, Type, ReferenceType, ReferenceID, CreatedAt)
-        SELECT i.UserID, @NotificationTitle,
-               N'Đặt lịch ' + i.BookingCode + N' chuyển sang trạng thái: ' + i.Status,
-               'Booking', 'Booking', i.BookingID, SYSDATETIME()
-        FROM inserted i
-        JOIN deleted d ON i.BookingID = d.BookingID
-        WHERE i.Status != d.Status
-          AND i.Status IN (N'Confirmed', N'Cancelled', N'Expired', N'Completed');
-    END;
+        END,
+        N'Đặt lịch ' + i.BookingCode + N' chuyển sang trạng thái: ' + i.Status,
+        'Booking', 'Booking', i.BookingID, SYSDATETIME()
+    FROM inserted i
+    JOIN deleted d ON i.BookingID = d.BookingID
+    WHERE i.Status != d.Status
+      AND i.Status IN (N'Confirmed', N'Cancelled', N'Expired', N'Completed');
 END;
 GO
 

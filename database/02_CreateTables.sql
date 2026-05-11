@@ -400,7 +400,7 @@ CREATE TABLE Operations.ChargingSession
     CONSTRAINT CK_ChargingSession_KWh CHECK (TotalKWh IS NULL OR TotalKWh >= 0),
     CONSTRAINT CK_ChargingSession_Time CHECK (EndTime IS NULL OR StartTime < EndTime),
     CONSTRAINT CK_ChargingSession_Status CHECK (SessionStatus IN ('Charging', 'Completed', 'Cancelled', 'Failed', 'Pending')),
-    CONSTRAINT CK_ChargingSession_StopReason CHECK (StopReason IS NULL OR StopReason IN ('Completed', 'UserStopped', 'PaymentFailed', 'Error', 'Timeout', 'EmergencyStop', 'Maintenance', 'Other'))
+    CONSTRAINT CK_ChargingSession_StopReason CHECK (StopReason IS NULL OR StopReason IN ('Completed', 'UserStopped', 'PaymentFailed', 'Error', 'Timeout', 'EmergencyStop', 'Maintenance', 'CancelledByUser', 'Other'))
 );
 GO
 

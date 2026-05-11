@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Users, Building2, Zap, BarChart3, Loader2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../../services/api';
+import { useSocketEvent } from '../../lib/useSocket';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/ui/StatusBadge';
 
@@ -9,11 +10,20 @@ export default function AdminDashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api.get('/dashboard/admin').then(r => {
       if (r.data) setData(r.data);
     }).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  useSocketEvent('session:started', () => { load(); });
+  useSocketEvent('session:ended', () => { load(); });
+  useSocketEvent('booking:created', () => { load(); });
+  useSocketEvent('booking:confirmed', () => { load(); });
+  useSocketEvent('error:resolved', () => { load(); });
+  useSocketEvent('maintenance:scheduled', () => { load(); });
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
   if (!data) return <div className="text-center py-20 text-slate-400">Không có dữ liệu</div>;
@@ -75,7 +85,7 @@ export default function AdminDashboardPage() {
           {(data.recentBookings || []).slice(0, 5).map((b: any) => (
             <div key={b.BookingID} className="flex justify-between p-2.5 bg-slate-50 rounded-lg mb-2 text-sm">
               <span className="font-medium">{b.StationName}</span>
-              <span className="text-slate-500">{new Date(b.StartTime).toLocaleString('vi-VN')}</span>
+              <span className="text-slate-500">{new Date(b.BookedFrom || b.StartTime).toLocaleString('vi-VN')}</span>
               <StatusBadge status={b.Status} />
             </div>
           ))}
@@ -86,7 +96,7 @@ export default function AdminDashboardPage() {
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
           <h3 className="font-semibold text-slate-900 mb-4">Lỗi gần đây</h3>
           {(data.recentErrors || []).slice(0, 5).map((e: any) => (
-            <div key={e.ErrorLogID} className="flex justify-between p-2.5 bg-red-50 rounded-lg mb-2 text-sm">
+            <div key={e.ErrorID} className="flex justify-between p-2.5 bg-red-50 rounded-lg mb-2 text-sm">
               <span className="font-medium">{e.ErrorCode}</span>
               <span className="text-slate-500">{e.PointCode}</span>
               <StatusBadge status={e.Severity} />

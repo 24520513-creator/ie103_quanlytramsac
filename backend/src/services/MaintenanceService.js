@@ -1,51 +1,71 @@
-const { query } = require('../config/database');
+const { execute } = require('../config/database');
 const { NotFoundError, successResponse } = require('../utils/response');
+const socketService = require('./socketService');
+const notificationService = require('./NotificationService');
 
 class MaintenanceService {
-  async scheduleMaintenance({ StationID, PointID, ScheduledDate, MaintenanceType, Description, Priority }) {
-    const result = await query(`INSERT INTO [Operations].[MaintenanceSchedule]
-      (StationID, PointID, ScheduledDate, MaintenanceType, Description, Priority, Status, CreatedAt)
-      OUTPUT INSERTED.*
-      VALUES (@StationID, @PointID, @ScheduledDate, @Type, @Description, @Priority, 'Scheduled', SYSDATETIME())`, {
-      StationID, PointID: PointID || null, ScheduledDate, Type: MaintenanceType || 'Routine',
-      Description: Description || null, Priority: Priority || 'Normal',
+  async scheduleMaintenance({ StationID, PointID, ScheduledFrom, ScheduledTo, ScheduledBy, MaintenanceType, Description }) {
+    const result = await execute('Operations.sp_ScheduleMaintenance', {
+      StationID, PointID: PointID || null, ScheduledBy,
+      ScheduledFrom, ScheduledTo,
+      MaintenanceType: MaintenanceType || 'Routine', Description: Description || null,
     });
-    return successResponse(result.recordset[0], 'Maintenance scheduled');
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new Error('Schedule maintenance returned no result');
+    }
+    const schedule = result.recordset[0];
+
+    socketService.sendToStation(StationID, 'maintenance:scheduled', schedule);
+    socketService.sendToRole('Manager', 'maintenance:scheduled', schedule);
+    socketService.sendToRole('Admin', 'maintenance:scheduled', schedule);
+
+    return successResponse(schedule, 'Maintenance scheduled');
   }
 
-  async completeMaintenance(maintenanceId, { PartsUsed, Cost, CompletedBy }) {
-    const existing = await query(`SELECT * FROM [Operations].[MaintenanceSchedule] WHERE MaintenanceID = @ID`,
-      { ID: maintenanceId });
-    if (existing.recordset.length === 0) throw new NotFoundError('MaintenanceSchedule');
-    const result = await query(`UPDATE [Operations].[MaintenanceSchedule]
-      SET Status = 'Completed', PartsUsed = @PartsUsed, Cost = @Cost, CompletedBy = @CompletedBy,
-      CompletedAt = SYSDATETIME(), UpdatedAt = SYSDATETIME()
-      OUTPUT INSERTED.* WHERE MaintenanceID = @ID`, {
-      ID: maintenanceId, PartsUsed: PartsUsed || null, Cost: Cost || null, CompletedBy: CompletedBy || null,
+  async completeMaintenance(maintenanceId, { Notes, CompletedAt }) {
+    const result = await execute('Operations.sp_CompleteMaintenance', {
+      ScheduleID: maintenanceId, Notes: Notes || null, CompletedAt: CompletedAt || null,
     });
-    return successResponse(result.recordset[0], 'Maintenance completed');
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new NotFoundError('MaintenanceSchedule');
+    }
+    const completed = result.recordset[0];
+
+    socketService.sendToStation(completed.StationID, 'maintenance:completed', completed);
+    socketService.sendToRole('Manager', 'maintenance:completed', completed);
+
+    return successResponse(completed, 'Maintenance completed');
   }
 
   async getUpcoming(days = 7) {
-    const result = await query(`SELECT ms.*, s.StationCode, s.StationName, p.PointCode
-      FROM [Operations].[MaintenanceSchedule] ms
-      JOIN [Infrastructure].[ChargingStation] s ON ms.StationID = s.StationID
-      LEFT JOIN [Infrastructure].[ChargingPoint] p ON ms.PointID = p.PointID
-      WHERE ms.Status IN ('Scheduled', 'InProgress')
-      AND ms.ScheduledDate <= DATEADD(DAY, @Days, SYSDATETIME())
-      ORDER BY ms.ScheduledDate`, { Days: days });
-    return successResponse(result.recordset);
+    const result = await execute('Operations.sp_GetUpcomingMaintenance', { Days: days });
+    return successResponse(result.recordset || []);
   }
 
   async resolveError(errorId, { ResolvedBy }) {
-    const existing = await query(`SELECT * FROM [Infrastructure].[ErrorLog] WHERE ErrorLogID = @ID`,
-      { ID: errorId });
-    if (existing.recordset.length === 0) throw new NotFoundError('ErrorLog');
-    const result = await query(`UPDATE [Infrastructure].[ErrorLog]
-      SET IsResolved = 1, ResolvedAt = SYSDATETIME(), ResolvedBy = @ResolvedBy
-      OUTPUT INSERTED.* WHERE ErrorLogID = @ID`,
-      { ID: errorId, ResolvedBy: ResolvedBy || null });
-    return successResponse(result.recordset[0], 'Error resolved');
+    const result = await execute('Infrastructure.sp_ResolveError', {
+      ErrorID: errorId, ResolvedBy: ResolvedBy || null,
+    });
+    if (!result.recordset || result.recordset.length === 0) {
+      throw new NotFoundError('ErrorLog');
+    }
+    const resolved = result.recordset[0];
+
+    socketService.sendToStation(resolved.StationID, 'error:resolved', resolved);
+    socketService.sendToRole('Manager', 'error:resolved', resolved);
+    socketService.sendToRole('Admin', 'error:resolved', resolved);
+
+    if (resolved.ReportedBy) {
+      notificationService.create(resolved.ReportedBy, {
+        Title: 'Lỗi đã được xử lý',
+        Body: `Lỗi #${errorId} tại trạm đã được giải quyết.`,
+        Type: 'Success',
+        ReferenceType: 'Error',
+        ReferenceID: errorId,
+      });
+    }
+
+    return successResponse(resolved, 'Error resolved');
   }
 }
 

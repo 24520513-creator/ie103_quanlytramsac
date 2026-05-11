@@ -17,6 +17,7 @@ class Transaction extends BaseModel {
       this.Description = row.Description;
       this.TransactedAt = row.TransactedAt;
       this.SettledAt = row.SettledAt;
+      this.CreatedAt = row.CreatedAt;
     }
   }
 }
@@ -32,6 +33,7 @@ class Wallet extends BaseModel {
       this.CurrencyCode = row.CurrencyCode;
       this.IsActive = row.IsActive ?? true;
       this.LastTransactionAt = row.LastTransactionAt;
+      this.CreatedAt = row.CreatedAt;
     }
   }
 }
@@ -49,6 +51,7 @@ class WalletTransaction extends BaseModel {
       this.Direction = row.Direction;
       this.TransactionType = row.TransactionType;
       this.Description = row.Description;
+      this.CreatedAt = row.CreatedAt;
     }
   }
 }

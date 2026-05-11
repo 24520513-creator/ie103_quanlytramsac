@@ -1,9 +1,0 @@
-DB Config:
-  SERVER: localhost
-  PORT: 1433
-  USER: sa
-  DATABASE: EV_Charging_System
-Database connected successfully
-EV Charging Backend running on port 3000
-Swagger docs: http://localhost:3000/api-docs
-Environment: development

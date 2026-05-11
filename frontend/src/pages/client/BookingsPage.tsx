@@ -1,45 +1,51 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Calendar, Plus, X, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { api } from '../../services/api';
+import { useSocketEvent } from '../../lib/useSocket';
+import { useBookings, useStations, usePoints } from '../../lib/useApi';
+import { queryKeys } from '../../lib/queryKeys';
 import PageHeader from '../../components/ui/PageHeader';
 import StatusBadge from '../../components/ui/StatusBadge';
-import type { Booking, ChargingStation, ChargingPoint } from '../../types';
 
 export default function BookingsPage() {
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
+  const { data: bookings = [], isLoading: bookingsLoading } = useBookings();
+  const { data: stations = [], isLoading: stationsLoading } = useStations();
+  const { data: points = [], isLoading: pointsLoading } = usePoints();
   const [showCreate, setShowCreate] = useState(false);
-  const [stations, setStations] = useState<ChargingStation[]>([]);
-  const [points, setPoints] = useState<ChargingPoint[]>([]);
-  const [form, setForm] = useState({ StationID: 0, PointID: 0, StartTime: '', EndTime: '', Notes: '' });
+  const [form, setForm] = useState({ StationID: 0, PointID: 0, BookedFrom: '', BookedTo: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const load = () => {
-    setLoading(true);
-    Promise.all([
-      api.get('/bookings').catch(() => ({ data: [] })),
-      api.get('/stations').catch(() => ({ data: [] })),
-      api.get('/points').catch(() => ({ data: [] })),
-    ]).then(([bRes, sRes, pRes]) => {
-      setBookings(Array.isArray(bRes?.data) ? bRes.data : []);
-      setStations(Array.isArray(sRes?.data) ? sRes.data : []);
-      setPoints(Array.isArray(pRes?.data) ? pRes.data : []);
-    }).finally(() => setLoading(false));
-  };
+  useSocketEvent('booking:created', () => {
+    qc.invalidateQueries({ queryKey: queryKeys.bookings.all() });
+  });
 
-  useEffect(() => { load(); }, []);
+  useSocketEvent('booking:confirmed', () => {
+    qc.invalidateQueries({ queryKey: queryKeys.bookings.all() });
+  });
+
+  useSocketEvent('booking:cancelled', () => {
+    qc.invalidateQueries({ queryKey: queryKeys.bookings.all() });
+  });
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError('');
     try {
-      await api.post('/bookings', form);
+      const normalizeDate = (d: string) => d && d.length === 16 ? d + ':00' : d;
+      const payload = {
+        ...form,
+        BookedFrom: normalizeDate(form.BookedFrom),
+        BookedTo: normalizeDate(form.BookedTo),
+      };
+      await api.post('/bookings', payload);
       setShowCreate(false);
-      setForm({ StationID: 0, PointID: 0, StartTime: '', EndTime: '', Notes: '' });
-      load();
+      setForm({ StationID: 0, PointID: 0, BookedFrom: '', BookedTo: '' });
+      qc.invalidateQueries({ queryKey: queryKeys.bookings.all() });
     } catch (err: any) { setError(err.message); }
     finally { setSaving(false); }
   };
@@ -47,20 +53,20 @@ export default function BookingsPage() {
   const handleCancel = async (id: number) => {
     try {
       await api.post(`/bookings/${id}/cancel`, { reason: 'CancelledByUser' });
-      load();
+      qc.invalidateQueries({ queryKey: queryKeys.bookings.all() });
     } catch (err: any) { alert(err.message); }
   };
 
   const handleConfirm = async (id: number) => {
     try {
       await api.post(`/bookings/${id}/confirm`);
-      load();
+      qc.invalidateQueries({ queryKey: queryKeys.bookings.all() });
     } catch (err: any) { alert(err.message); }
   };
 
-  const filteredPoints = form.StationID ? points.filter(p => p.StationID === form.StationID) : [];
+  const filteredPoints = form.StationID ? points.filter((p: any) => p.StationID === form.StationID) : [];
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+  if (bookingsLoading || stationsLoading || pointsLoading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
 
   return (
     <div className="space-y-6">
@@ -89,7 +95,7 @@ export default function BookingsPage() {
               <div className="flex items-center gap-4 text-sm text-slate-600 mb-3">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
-                  {new Date(b.StartTime).toLocaleString('vi-VN')} - {new Date(b.EndTime).toLocaleTimeString('vi-VN')}
+                  {new Date(b.BookedFrom).toLocaleString('vi-VN')} - {new Date(b.BookedTo).toLocaleTimeString('vi-VN')}
                 </span>
               </div>
               <div className="flex gap-2">
@@ -136,12 +142,10 @@ export default function BookingsPage() {
                   <option key={p.PointID} value={p.PointID}>{p.PointCode} - {p.PowerKW}kW</option>
                 ))}
               </select>
-              <input type="datetime-local" value={form.StartTime} onChange={e => setForm(p => ({...p, StartTime: e.target.value}))} required
+              <input type="datetime-local" value={form.BookedFrom} onChange={e => setForm(p => ({...p, BookedFrom: e.target.value}))} required
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
-              <input type="datetime-local" value={form.EndTime} onChange={e => setForm(p => ({...p, EndTime: e.target.value}))} required
+              <input type="datetime-local" value={form.BookedTo} onChange={e => setForm(p => ({...p, BookedTo: e.target.value}))} required
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
-              <textarea value={form.Notes} onChange={e => setForm(p => ({...p, Notes: e.target.value}))} placeholder="Ghi chú"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none" rows={2} />
               <button type="submit" disabled={saving}
                 className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50">
                 {saving ? 'Đang đặt...' : 'Đặt lịch'}

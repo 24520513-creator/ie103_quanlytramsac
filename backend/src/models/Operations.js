@@ -16,6 +16,8 @@ class PricingPolicy extends BaseModel {
       this.AppliedFrom = row.AppliedFrom;
       this.AppliedTo = row.AppliedTo;
       this.IsActive = row.IsActive ?? true;
+      this.CreatedAt = row.CreatedAt;
+      this.UpdatedAt = row.UpdatedAt;
     }
   }
 }
@@ -31,6 +33,7 @@ class ChargingSession extends BaseModel {
       this.PointID = row.PointID;
       this.StationID = row.StationID;
       this.PolicyID = row.PolicyID;
+      this.BookingID = row.BookingID;
       this.StartTime = row.StartTime;
       this.EndTime = row.EndTime;
       this.StartBatteryPercent = row.StartBatteryPercent;
@@ -43,6 +46,8 @@ class ChargingSession extends BaseModel {
       this.CurrencyCode = row.CurrencyCode;
       this.StopReason = row.StopReason;
       this.SessionStatus = row.SessionStatus;
+      this.CreatedAt = row.CreatedAt;
+      this.UpdatedAt = row.UpdatedAt;
     }
   }
 }
@@ -52,18 +57,16 @@ class Booking extends BaseModel {
     super();
     if (row) {
       this.BookingID = row.BookingID;
+      this.BookingCode = row.BookingCode;
       this.UserID = row.UserID;
       this.PointID = row.PointID;
       this.StationID = row.StationID;
       this.VehicleID = row.VehicleID;
-      this.BookingTime = row.BookingTime;
-      this.StartTime = row.StartTime;
-      this.EndTime = row.EndTime;
+      this.BookedFrom = row.BookedFrom;
+      this.BookedTo = row.BookedTo;
       this.Status = row.Status;
-      this.Notes = row.Notes;
-      this.CancelledAt = row.CancelledAt;
-      this.CancelReason = row.CancelReason;
       this.CreatedAt = row.CreatedAt;
+      this.UpdatedAt = row.UpdatedAt;
     }
   }
 }
@@ -72,19 +75,19 @@ class MaintenanceSchedule extends BaseModel {
   constructor(row) {
     super();
     if (row) {
-      this.MaintenanceID = row.MaintenanceID;
+      this.ScheduleID = row.ScheduleID;
       this.StationID = row.StationID;
       this.PointID = row.PointID;
-      this.ScheduledDate = row.ScheduledDate;
+      this.ScheduledBy = row.ScheduledBy;
+      this.ScheduledFrom = row.ScheduledFrom;
+      this.ScheduledTo = row.ScheduledTo;
       this.MaintenanceType = row.MaintenanceType;
       this.Description = row.Description;
-      this.PartsUsed = row.PartsUsed;
-      this.Cost = row.Cost;
-      this.Priority = row.Priority;
       this.Status = row.Status;
       this.CompletedAt = row.CompletedAt;
-      this.CompletedBy = row.CompletedBy;
+      this.Notes = row.Notes;
       this.CreatedAt = row.CreatedAt;
+      this.UpdatedAt = row.UpdatedAt;
     }
   }
 }
@@ -96,10 +99,10 @@ class StationReview extends BaseModel {
       this.ReviewID = row.ReviewID;
       this.UserID = row.UserID;
       this.StationID = row.StationID;
-      this.SessionID = row.SessionID;
       this.Rating = row.Rating;
       this.Comment = row.Comment;
       this.CreatedAt = row.CreatedAt;
+      this.UpdatedAt = row.UpdatedAt;
     }
   }
 }

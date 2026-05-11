@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard, MapPin, Zap, History, Settings, Users, Building2,
   AlertTriangle, Wallet, Battery, LogOut, Menu, X, BarChart3,
@@ -8,6 +9,8 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../../lib/utils';
+import { connectSocket, getSocket, disconnectSocket } from '../../services/socket';
+import { useSocketEvent } from '../../lib/useSocket';
 
 const clientNav = [
   { id: 'dashboard', name: 'Tổng quan', icon: LayoutDashboard, path: '/client/dashboard' },
@@ -44,8 +47,10 @@ const roleNavMap: Record<string, { id: string; name: string; icon: any; path: st
 
 export default function AppLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   const userStr = localStorage.getItem('user');
   let user: any = null;
@@ -58,7 +63,30 @@ export default function AppLayout() {
   const frontendRole = roleMap[user?.Role] || 'client';
   const nav = roleNavMap[frontendRole] || clientNav;
 
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const socket = connectSocket(token);
+    const onReconnect = () => {
+      queryClient.invalidateQueries();
+    };
+    socket.on('connect', onReconnect);
+    return () => {
+      socket.off('connect', onReconnect);
+      disconnectSocket();
+    };
+  }, [queryClient]);
+
+  useSocketEvent('notification:new', (notification: any) => {
+    if (!notification.IsRead) setUnreadCount(c => c + 1);
+  });
+
+  useSocketEvent('notification:read', () => {
+    setUnreadCount(c => Math.max(0, c - 1));
+  });
+
   const handleLogout = () => {
+    disconnectSocket();
     localStorage.clear();
     navigate('/login');
   };
@@ -97,6 +125,11 @@ export default function AppLayout() {
             >
               <item.icon className={cn("w-5 h-5", currentTab === item.id ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
               {isSidebarOpen && <span className="font-medium">{item.name}</span>}
+              {item.id === 'notifications' && unreadCount > 0 && (
+                <span className="ml-auto bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
               {currentTab === item.id && isSidebarOpen && (
                 <motion.div layoutId="active-pill" className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
               )}

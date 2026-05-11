@@ -18,12 +18,12 @@ function createCrudController(service, entityName) {
     }),
 
     create: asyncHandler(async (req, res) => {
-      const result = await service.create({ ...req.body, CreatedBy: req.user?.UserID || null });
+      const result = await service.create(req.body);
       res.status(201).json(result);
     }),
 
     update: asyncHandler(async (req, res) => {
-      const result = await service.update(req.params.id, { ...req.body, UpdatedBy: req.user?.UserID || null });
+      const result = await service.update(req.params.id, req.body);
       res.json(result);
     }),
 

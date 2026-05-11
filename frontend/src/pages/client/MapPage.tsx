@@ -98,7 +98,7 @@ export default function MapPage() {
                 <p className="text-xs text-slate-500">Đang sạc</p>
               </div>
             </div>
-            <button onClick={() => { setSelected(null); navigate('/client/vehicles'); }}
+            <button onClick={() => { setSelected(null); navigate('/client/charging'); }}
               className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
               <Navigation className="w-5 h-5" /> Bắt đầu sạc
             </button>

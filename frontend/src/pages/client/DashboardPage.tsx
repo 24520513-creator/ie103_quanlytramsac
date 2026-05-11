@@ -1,29 +1,34 @@
-import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Wallet, Zap, Battery, History, Loader2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { api } from '../../services/api';
+import { useSocketEvent } from '../../lib/useSocket';
+import { useMyWallet, useMySessions } from '../../lib/useApi';
+import { queryKeys } from '../../lib/queryKeys';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/ui/StatusBadge';
-import type { Wallet as WalletType, ChargingSession } from '../../types';
 
 export default function DashboardPage() {
-  const [loading, setLoading] = useState(true);
-  const [wallet, setWallet] = useState<WalletType | null>(null);
-  const [sessions, setSessions] = useState<ChargingSession[]>([]);
-  const [error, setError] = useState('');
+  const qc = useQueryClient();
+  const { data: wallet, isLoading: walletLoading } = useMyWallet();
+  const { data: sessions, isLoading: sessionsLoading } = useMySessions();
 
-  useEffect(() => {
-    Promise.all([
-      api.get('/wallet/my').catch(() => null),
-      api.get('/sessions/my').catch(() => null),
-    ]).then(([walletRes, sessRes]) => {
-      if (walletRes?.data) setWallet(walletRes.data);
-      if (sessRes?.data) setSessions(Array.isArray(sessRes.data) ? sessRes.data : []);
-    }).catch(err => setError(err.message))
-    .finally(() => setLoading(false));
-  }, []);
+  useSocketEvent('wallet:updated', () => {
+    qc.invalidateQueries({ queryKey: queryKeys.wallet.my });
+  });
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+  useSocketEvent('session:started', () => {
+    qc.invalidateQueries({ queryKey: queryKeys.sessions.my });
+  });
+  useSocketEvent('session:ended', () => {
+    qc.invalidateQueries({ queryKey: queryKeys.sessions.my });
+  });
+  useSocketEvent('session:cancelled', () => {
+    qc.invalidateQueries({ queryKey: queryKeys.sessions.my });
+  });
+
+  if (walletLoading || sessionsLoading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+
+  const error = '';
 
   const totalKWh = sessions.reduce((s, c) => s + (c.TotalKWh || 0), 0);
   const totalCost = sessions.reduce((s, c) => s + (c.CostTotal || 0), 0);

@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { UnauthorizedError } = require('../utils/response');
+const { UnauthorizedError, ForbiddenError } = require('../utils/response');
 const authConfig = require('../config/auth');
 
 function authenticate(req, res, next) {
@@ -21,7 +21,7 @@ function authorize(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user) throw new UnauthorizedError();
     if (!allowedRoles.includes(req.user.Role) && !allowedRoles.includes('*')) {
-      throw new UnauthorizedError('Insufficient permissions');
+      throw new ForbiddenError('Insufficient permissions');
     }
     next();
   };

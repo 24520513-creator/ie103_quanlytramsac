@@ -1,13 +1,5 @@
-function success(data, message = 'Success') {
-  return { success: true, message, data };
-}
-
 function successResponse(data, message = 'Success') {
   return { success: true, message, data };
-}
-
-function fail(message = 'Internal server error', statusCode = 500) {
-  return { success: false, message, error: message };
 }
 
 function errorResponse(message = 'Internal server error', statusCode = 500) {
@@ -29,6 +21,10 @@ class BadRequestError extends AppError {
 
 class UnauthorizedError extends AppError {
   constructor(message = 'Unauthorized') { super(message, 401); }
+}
+
+class ForbiddenError extends AppError {
+  constructor(message = 'Access denied') { super(message, 403); }
 }
 
 class NotFoundError extends AppError {
@@ -57,7 +53,7 @@ function paginatedResponse(data, total, page, limit) {
 }
 
 module.exports = {
-  success, successResponse, fail, errorResponse, paginatedResponse,
-  AppError, BadRequestError, UnauthorizedError,
+  successResponse, errorResponse, paginatedResponse,
+  AppError, BadRequestError, UnauthorizedError, ForbiddenError,
   NotFoundError, ConflictError, ValidationError,
 };

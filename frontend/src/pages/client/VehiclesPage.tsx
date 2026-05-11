@@ -26,8 +26,11 @@ export default function VehiclesPage() {
     e.preventDefault();
     setSaving(true);
     setError('');
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
     try {
       await api.post('/vehicles', {
+        UserID: user?.UserID || null,
         PlateNumber: form.PlateNumber,
         Brand: form.Brand,
         Model: form.Model,

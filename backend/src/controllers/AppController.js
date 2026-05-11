@@ -1,11 +1,19 @@
 const chargingSessionService = require('../services/ChargingSessionService');
 const paymentService = require('../services/PaymentService');
 const dashboardService = require('../services/DashboardService');
+const bookingService = require('../services/BookingService');
+const maintenanceService = require('../services/MaintenanceService');
+const notificationService = require('../services/NotificationService');
 const { asyncHandler } = require('../middleware/errorHandler');
-const { successResponse, NotFoundError } = require('../utils/response');
+const { successResponse, NotFoundError, ValidationError } = require('../utils/response');
 const { query } = require('../config/database');
 
+// =========================================================================
+// Session flows
+// =========================================================================
 exports.startSession = asyncHandler(async (req, res) => {
+  const { PointID } = req.body;
+  if (!PointID) throw new ValidationError('PointID is required');
   const result = await chargingSessionService.startSession({ ...req.body, UserID: req.user.UserID });
   res.status(201).json(result);
 });
@@ -26,7 +34,8 @@ exports.getActiveSessions = asyncHandler(async (req, res) => {
 });
 
 exports.getMySessions = asyncHandler(async (req, res) => {
-  const sessions = await chargingSessionService.getActiveSessions({ userId: req.user.UserID, ...req.query });
+  // SECURITY: userId is always from token, cannot be overridden by query params
+  const sessions = await chargingSessionService.getActiveSessions({ userId: req.user.UserID, ...removeOverrides(req.query, ['userId']) });
   res.json(successResponse(sessions));
 });
 
@@ -47,8 +56,12 @@ exports.getSessionHistory = asyncHandler(async (req, res) => {
   res.json(successResponse(history));
 });
 
+// =========================================================================
 // Payment flows
+// =========================================================================
 exports.createPayment = asyncHandler(async (req, res) => {
+  const { SessionID } = req.body;
+  if (!SessionID) throw new ValidationError('SessionID is required');
   const result = await paymentService.createPayment({ ...req.body, UserID: req.user.UserID });
   res.status(201).json(result);
 });
@@ -59,7 +72,11 @@ exports.getMyWallet = asyncHandler(async (req, res) => {
 });
 
 exports.topUpWallet = asyncHandler(async (req, res) => {
-  const result = await paymentService.topUpWallet(req.user.UserID, req.body.amount, req.body.paymentMethod);
+  const amount = parseFloat(req.body.amount);
+  if (!amount || amount <= 0 || !Number.isFinite(amount)) {
+    throw new ValidationError('A valid positive amount is required');
+  }
+  const result = await paymentService.topUpWallet(req.user.UserID, amount, req.body.paymentMethod);
   res.json(result);
 });
 
@@ -68,10 +85,14 @@ exports.getMyTransactions = asyncHandler(async (req, res) => {
   res.json(successResponse(txns));
 });
 
+// =========================================================================
 // Booking flows
-const bookingService = require('../services/BookingService');
-
+// =========================================================================
 exports.createBooking = asyncHandler(async (req, res) => {
+  const { PointID, StationID, BookedFrom, BookedTo } = req.body;
+  if (!PointID || !StationID || !BookedFrom || !BookedTo) {
+    throw new ValidationError('PointID, StationID, BookedFrom, BookedTo are required');
+  }
   const result = await bookingService.createBooking({ ...req.body, UserID: req.user.UserID });
   res.status(201).json(result);
 });
@@ -87,20 +108,28 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
 });
 
 exports.checkPointAvailability = asyncHandler(async (req, res) => {
-  const result = await bookingService.checkAvailability(req.query.pointId, req.query.startTime, req.query.endTime);
+  const { pointId, startTime, endTime } = req.query;
+  if (!pointId || !startTime || !endTime) {
+    throw new ValidationError('pointId, startTime, endTime query params are required');
+  }
+  const result = await bookingService.checkAvailability(pointId, startTime, endTime);
   res.json(result);
 });
 
+// =========================================================================
 // Maintenance flows
-const maintenanceService = require('../services/MaintenanceService');
-
+// =========================================================================
 exports.scheduleMaintenance = asyncHandler(async (req, res) => {
-  const result = await maintenanceService.scheduleMaintenance(req.body);
+  const { StationID, ScheduledFrom, ScheduledTo } = req.body;
+  if (!StationID || !ScheduledFrom || !ScheduledTo) {
+    throw new ValidationError('StationID, ScheduledFrom, ScheduledTo are required');
+  }
+  const result = await maintenanceService.scheduleMaintenance({ ...req.body, ScheduledBy: req.user.UserID });
   res.status(201).json(result);
 });
 
 exports.completeMaintenance = asyncHandler(async (req, res) => {
-  const result = await maintenanceService.completeMaintenance(req.params.id, { ...req.body, CompletedBy: req.user.UserID });
+  const result = await maintenanceService.completeMaintenance(req.params.id, { Notes: req.body.Notes, CompletedAt: req.body.CompletedAt });
   res.json(result);
 });
 
@@ -114,9 +143,9 @@ exports.resolveError = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+// =========================================================================
 // Notification flows
-const notificationService = require('../services/NotificationService');
-
+// =========================================================================
 exports.getUserNotifications = asyncHandler(async (req, res) => {
   const result = await notificationService.getUserNotifications(req.user.UserID, req.query);
   res.json(result);
@@ -132,7 +161,9 @@ exports.getUnreadNotificationCount = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+// =========================================================================
 // Dashboard
+// =========================================================================
 exports.getStationDashboard = asyncHandler(async (req, res) => {
   const result = await dashboardService.getStationDashboard(req.params.id, req.query.days);
   res.json(result);
@@ -147,3 +178,14 @@ exports.getAdminDashboard = asyncHandler(async (req, res) => {
   const result = await dashboardService.getAdminDashboard();
   res.json(result);
 });
+
+// =========================================================================
+// Helpers
+// =========================================================================
+function removeOverrides(obj, blocked) {
+  const result = { ...obj };
+  for (const key of blocked) {
+    delete result[key];
+  }
+  return result;
+}

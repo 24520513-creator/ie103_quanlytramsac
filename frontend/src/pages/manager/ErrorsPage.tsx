@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { api } from '../../services/api';
+import { useSocketEvent } from '../../lib/useSocket';
 import PageHeader from '../../components/ui/PageHeader';
 import StatusBadge from '../../components/ui/StatusBadge';
 import type { ErrorLog } from '../../types';
@@ -10,13 +11,15 @@ export default function ManagerErrorsPage() {
   const [errors, setErrors] = useState<ErrorLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = () => {
+  const load = useCallback(() => {
     api.get('/error-logs').then(r => {
       setErrors(Array.isArray(r.data) ? r.data : []);
     }).finally(() => setLoading(false));
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+
+  useSocketEvent('error:resolved', () => { load(); });
 
   const handleResolve = async (id: number) => {
     try {
@@ -27,8 +30,8 @@ export default function ManagerErrorsPage() {
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
 
-  const unresolved = errors.filter(e => !e.IsResolved);
-  const resolved = errors.filter(e => e.IsResolved);
+  const unresolved = errors.filter(e => !e.ResolvedAt);
+  const resolved = errors.filter(e => e.ResolvedAt);
 
   return (
     <div className="space-y-6">
@@ -38,22 +41,22 @@ export default function ManagerErrorsPage() {
         <div className="space-y-3">
           <h3 className="font-semibold text-slate-900">Chưa xử lý</h3>
           {unresolved.map(e => (
-            <motion.div key={e.ErrorLogID} whileHover={{ y: -1 }}
+            <motion.div key={e.ErrorID} whileHover={{ y: -1 }}
               className="bg-white rounded-2xl border-l-4 border-l-red-500 border border-slate-200 p-5">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5" />
                   <div>
                     <p className="font-semibold text-slate-900">{e.ErrorCode}</p>
-                    <p className="text-sm text-slate-600">{e.Message || e.ErrorSource}</p>
+                    <p className="text-sm text-slate-600">{e.Description}</p>
                     <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
                       <StatusBadge status={e.Severity} />
                       <span>Điểm {e.PointCode || `#${e.PointID}`}</span>
-                      <span>{new Date(e.CreatedAt || '').toLocaleString('vi-VN')}</span>
+                      <span>{new Date(e.OccurredAt || '').toLocaleString('vi-VN')}</span>
                     </div>
                   </div>
                 </div>
-                <button onClick={() => handleResolve(e.ErrorLogID)}
+                <button onClick={() => handleResolve(e.ErrorID)}
                   className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-100">
                   <CheckCircle className="w-4 h-4" /> Xử lý
                 </button>
@@ -67,7 +70,7 @@ export default function ManagerErrorsPage() {
         <div className="space-y-3">
           <h3 className="font-semibold text-slate-900">Đã xử lý</h3>
           {resolved.map(e => (
-            <div key={e.ErrorLogID} className="bg-slate-50 rounded-2xl border border-slate-200 p-4 opacity-70">
+            <div key={e.ErrorID} className="bg-slate-50 rounded-2xl border border-slate-200 p-4 opacity-70">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-emerald-500" />

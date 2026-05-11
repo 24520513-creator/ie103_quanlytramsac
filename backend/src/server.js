@@ -1,8 +1,16 @@
 require('dotenv').config({ path: '.env' });
 const app = require('./app');
 const { getPool, closePool } = require('./config/database');
+const socketService = require('./services/socketService');
 
 const PORT = process.env.PORT || 3000;
+
+process.on('unhandledRejection', (reason) => {
+  console.error('UNHANDLED PROMISE REJECTION:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err);
+});
 
 async function start() {
   try {
@@ -14,6 +22,9 @@ async function start() {
       console.log(`Swagger docs: http://localhost:${PORT}/api-docs`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     });
+
+    socketService.init(server);
+    console.log('WebSocket server initialized');
 
     const gracefulShutdown = async () => {
       console.log('\nShutting down gracefully...');
