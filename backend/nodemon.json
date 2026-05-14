@@ -1,5 +1,0 @@
-{
-  "watch": ["src"],
-  "ignore": ["../database/**", ".git/**", "node_modules/**"],
-  "delay": "1000"
-}
