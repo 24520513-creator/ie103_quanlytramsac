@@ -1,720 +1,98 @@
-# ⚡ EV Charging Management System
+# EV_Charging_System - Database Project IE103
 
-A full-stack enterprise demo system for managing electric vehicle charging station networks. Supports franchise management, real-time charging sessions, pricing engine, wallet payments, IoT monitoring, and role-based administration.
+Đây là database độc lập cho đồ án:
 
----
+> Hệ thống quản lý mạng lưới trạm sạc xe điện và doanh nghiệp nhượng quyền
 
-## Tech Stack
+Trọng tâm project là SQL Server/SSMS. Backend, frontend và deploy có thể phát triển tiếp sau, nhưng database hiện tại đã đủ tự chạy, tự seed dữ liệu, test nghiệp vụ, test phân quyền và xem báo cáo.
 
-| Layer | Technology |
-|-------|-----------|
-| **Database** | Microsoft SQL Server 2022+ (T-SQL) |
-| **Backend** | Node.js + Express.js |
-| **Frontend** | React 18 + Vite |
-| **Auth** | JWT (JSON Web Tokens) |
-| **API Style** | RESTful |
+## Thiết kế hiện tại
 
-### Architecture
+- DBMS: Microsoft SQL Server.
+- Database: `EV_Charging_System`.
+- Schema chính:
+  - `Core`: quốc gia, khu vực, địa chỉ.
+  - `Identity`: user, role, permission, user-role, profile.
+  - `Infrastructure`: trạm sạc, cổng sạc, connector, telemetry.
+  - `Franchise`: đối tác, hợp đồng, trạm thuộc franchise, chính sách chia doanh thu, settlement.
+  - `Operations`: xe, đặt lịch, phiên sạc, giá sạc, sự kiện phiên.
+  - `Payments`: ví, QR, giao dịch, hóa đơn, hoàn tiền.
+  - `Maintenance`: lỗi, ticket, phân công, lịch sử xử lý.
+  - `Reporting`: view/procedure báo cáo.
+  - `Audit`: audit log.
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    Frontend                         │
-│          React + Vite (port 8000)                   │
-└──────────────────┬──────────────────────────────────┘
-                   │ HTTP (Axios)
-                   ▼
-┌─────────────────────────────────────────────────────┐
-│                    Backend                          │
-│        Node.js + Express (port 3000)                │
-│    JWT Auth │ RBAC │ Business Logic                 │
-└──────────────────┬──────────────────────────────────┘
-                   │ MSSQL (mssql driver)
-                   ▼
-┌─────────────────────────────────────────────────────┐
-│              SQL Server Database                    │
-│         EV_Charging_System (port 1433)              │
-│   9 Schemas │ 48 Tables │ Views │ Stored Procedures │
-└─────────────────────────────────────────────────────┘
-```
+## Cách chạy nhanh
 
----
+Trong SSMS:
 
-## Prerequisites
+1. Mở `database/run_all.sql`.
+2. Bật `Query -> SQLCMD Mode`.
+3. Execute toàn bộ file.
 
-Install the following before starting:
+Command line:
 
-1. **Node.js** v18+ or v20+
-   - Download: https://nodejs.org/
-   - Verify: `node --version`
-2. **SQL Server** 2022 Developer Edition (free)
-   - Download: https://go.microsoft.com/fwlink/p/?linkid=2215158
-   - Verify: SQL Server service is running
-3. **SQL Server Management Studio (SSMS)**
-   - Download: https://aka.ms/ssmsfullsetup
-4. **Git**
-   - Download: https://git-scm.com/
-5. **Postman** (optional, for API testing)
-   - Download: https://www.postman.com/downloads/
-
----
-
-## Database Setup
-
-### Step 1: Open SSMS and Connect
-
-1. Launch **SQL Server Management Studio**
-2. Connect to your server instance:
-   - **Server name:** `localhost` or `.\SQLEXPRESS` or `(local)`
-   - **Authentication:** `SQL Server Authentication`
-   - **Login:** `sa`
-   - **Password:** *(your sa password)*
-3. Click **Connect**
-
-### Step 2: Run the Database Setup Script
-
-The master deployment script is located at:
-
-```
-database/run_all.sql
+```bat
+cd database
+run_all.bat
 ```
 
-This script will:
-- Create the `EV_Charging_System` database
-- Create 9 schemas (Infrastructure, Access, Users, Operations, Payments, Monitoring, Audit, Analytics, Reporting)
-- Create 48 tables with all constraints (PK, FK, CHECK)
-- Create indexes, security policies, and RBAC
-- Seed all reference data (countries, regions, stations, users, pricing, etc.)
-- Create functions, stored procedures, triggers, views, and analytics objects
+`run_all.bat` đọc `backend/.env` nếu có, nhưng database không phụ thuộc backend.
 
-**To execute:**
+## File database
 
-1. In SSMS, click **Query → SQLCMD Mode** to enable SQLCMD includes.
-2. Click **File → Open → File** and open `database/run_all.sql`.
-3. Click the **Execute** button (F5).
+Folder `database` đã được dọn gọn thành bộ script chính:
 
-If you do not want to use SQLCMD Mode, run the scripts in `database/forSSMS/` manually from `01_...sql` through `12_...sql`.
-
-> ⏱ Full execution takes approximately 30-60 seconds.
-
-### Step 3: Verify Database Creation
-
-Run these queries in SSMS to verify:
-
-```sql
--- Check database exists
-SELECT name FROM sys.databases WHERE name = 'EV_Charging_System';
-
--- Check all schemas
-SELECT name FROM sys.schemas WHERE name IN
-('Infrastructure','Access','Users','Operations','Payments','Monitoring','Audit','Analytics','Reporting');
-
--- Count tables per schema
-SELECT s.name AS SchemaName, COUNT(*) AS TableCount
-FROM sys.tables t
-JOIN sys.schemas s ON t.schema_id = s.schema_id
-WHERE s.name IN ('Infrastructure','Access','Users','Operations','Payments','Monitoring','Audit','Analytics')
-GROUP BY s.name
-ORDER BY s.name;
-
--- Should show: 48 total tables across 8 schemas (Reporting is views only)
-
--- Check seed data exists
-SELECT COUNT(*) AS UserCount FROM [Users].[User];
-SELECT COUNT(*) AS StationCount FROM [Infrastructure].[ChargingStation];
-SELECT COUNT(*) AS FranchiseCount FROM [Infrastructure].[Franchise];
-SELECT COUNT(*) AS PolicyCount FROM [Operations].[PricingPolicy];
+```text
+00_Drop_And_Create_Database.sql
+01_Create_Schemas.sql
+02_Create_Tables.sql
+03_Create_Constraints_Indexes.sql
+04_Create_Functions.sql
+05_Create_Stored_Procedures.sql
+06_Create_Triggers.sql
+07_Create_Reporting.sql
+08_Create_Security.sql
+09_Seed_Demo_Data.sql
+10_Demo_Queries.sql
+11_Test_Roles.sql
+12_Backup_Restore.sql
+run_all.sql
+run_all.bat
+README.md
 ```
 
-### Step 4: Insert Demo User Credentials
+## Role chính
 
-⚠️ **IMPORTANT:** After running `run_all.sql`, you must insert the password credentials for demo accounts.
+- `SystemAdmin`
+- `OperationsStaff`
+- `BusinessManager`
+- `Customer`
 
-The seed script creates user accounts (`admin`, `operator`, `customer`), but passwords must be added separately.
+## Demo bằng SSMS
 
-**To add credentials:**
+Sau khi chạy `run_all.sql`, các phần sau đã được thực hiện:
 
-1. In SSMS, open the `insert_credentials.sql` file
-2. Execute it (F5)
-3. This will insert bcrypt-hashed passwords for all demo users
+- Tạo database, schema, table, PK/FK/CHECK/index.
+- Seed dữ liệu giả lập hợp lý.
+- Chạy query báo cáo.
+- Demo luồng: start session -> end session -> payment -> invoice.
+- Demo rollback refund sai số tiền.
+- Demo phân quyền bằng `EXECUTE AS USER`.
 
-All demo accounts use password: **`123456`**
+Các script có thể chạy riêng:
 
----
+- `database/10_Demo_Queries.sql`
+- `database/11_Test_Roles.sql`
+- `database/12_Backup_Restore.sql`
 
-### Step 5: Verify Seed Accounts
+## Hướng phát triển backend/frontend sau này
 
-Now verify the demo accounts were created with correct roles:
+Database đã có khóa chính/khóa ngoại, status lifecycle, role model, procedure nghiệp vụ và report view rõ ràng, nên backend có thể map API theo các module:
 
-```sql
--- Check demo users exist
-SELECT UserID, Username, Email, AccountStatus
-FROM [Users].[User]
-WHERE Username IN ('admin', 'operator', 'customer');
-
--- Check their role assignments
-SELECT u.Username, r.RoleCode, r.RoleName
-FROM [Users].[User] u
-JOIN [Users].[UserRole] ur ON u.UserID = ur.UserID
-JOIN [Access].[Role] r ON ur.RoleID = r.RoleID
-WHERE u.Username IN ('admin', 'operator', 'customer');
-
--- Check credentials are inserted (should return 3 rows)
-SELECT COUNT(*) AS DemoCredentialsCount
-FROM Users.UserCredential uc
-JOIN Users.[User] u ON uc.UserID = u.UserID
-WHERE u.Username IN ('admin', 'operator', 'customer');
-```
-
-Expected output:
-
-**Demo Users:**
-| UserID | Username | Email | AccountStatus |
-|--------|----------|-------|---|
-| 2 | admin | admin@evcharge.com | Active |
-| 3 | operator | operator@evcharge.com | Active |
-| 4 | customer | customer@evcharge.com | Active |
-
-**Role Assignments:**
-| Username | RoleCode | RoleName |
-|----------|----------|----------|
-| admin | SysAdmin | System Administrator |
-| operator | Operator | Operator |
-| customer | CUSTOMER | Customer |
-
-**Credentials Count:** Should show `3`
-
----
-
-### Troubleshooting: No Demo Users Found
-
-**Problem:** After running seed script, query returns 0 rows
-
-**Solution:**
-1. Verify you ran `insert_credentials.sql` after `run_all.sql`
-2. Check that `run_all.sql` includes the updated seed data (should have 12 users total)
-3. Manually insert credentials if needed:
-   ```sql
-   -- Re-run insert_credentials.sql
-   ```
-
----
-
-## Backend Setup
-
-### Step 1: Navigate to Backend Folder
-
-```bash
-cd backend
-```
-
-### Step 2: Install Dependencies
-
-```bash
-npm install
-```
-
-This installs: `express`, `mssql`, `jsonwebtoken`, `bcryptjs`, `cors`, `helmet`, `morgan`, `dotenv`, `uuid`, `express-rate-limit`.
-
-### Step 3: Configure Environment
-
-Create a `.env` file in the `backend/` folder (or edit the existing one):
-
-```env
-PORT=3000
-
-DB_SERVER=localhost
-DB_PORT=1433
-DB_USER=sa
-DB_PASSWORD=YourPassword123
-DB_NAME=EV_Charging_System
-
-JWT_SECRET=ev-charging-super-secret-key-2026
-JWT_EXPIRES_IN=8h
-JWT_REFRESH_EXPIRES_IN=7d
-
-BCRYPT_SALT_ROUNDS=12
-```
-
-> ⚠️ Replace `DB_PASSWORD` with your actual SQL Server `sa` password.
-> ⚠️ Change `DB_SERVER` if connecting to a named instance (e.g., `.\SQLEXPRESS`).
-
-### Step 4: Start the Backend
-
-```bash
-npm start
-```
-
-Expected output:
-
-```
-Database connected successfully
-EV Charging Backend running on port 3000
-```
-
-For development with auto-reload:
-
-```bash
-npm run dev
-```
-
-### Step 5: Test the Backend API
-
-Open Postman or your browser and test:
-
-**Health Check:**
-```
-GET http://localhost:3000/api/health
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": { "status": "ok", "timestamp": "2026-05-08T..." },
-  "message": "Service is running"
-}
-```
-
-**Login:**
-```
-POST http://localhost:3000/api/auth/login
-Content-Type: application/json
-
-{
-  "Email": "customer",
-  "Password": "123456"
-}
-```
-
-Response:
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "refreshToken": "uuid-here",
-  "user": {
-    "UserID": 3,
-    "Username": "customer",
-    "Email": "customer@evcharge.com",
-    "roles": ["CUSTOMER"]
-  }
-}
-```
-
-**Get Stations (authenticated):**
-```
-GET http://localhost:3000/api/stations
-Authorization: Bearer <token>
-```
-
----
-
-## Frontend Setup
-
-### Step 1: Navigate to Frontend Folder
-
-```bash
-cd frontend
-```
-
-### Step 2: Install Dependencies
-
-```bash
-npm install
-```
-
-This installs: `react`, `react-dom`, `react-router-dom`, `axios`, `vite`, `@vitejs/plugin-react`.
-
-### Step 3: Configure API Base URL
-
-The API base URL is configured in `src/api.js`:
-
-```javascript
-const api = axios.create({
-  baseURL: 'http://localhost:3000/api',
-});
-```
-
-Change this if your backend runs on a different port or host.
-
-### Step 4: Start the Frontend
-
-```bash
-npm run dev
-```
-
-Expected output:
-
-```
-VITE v5.x.x  ready in xxx ms
-  ➜  Local:   http://localhost:8000/
-  ➜  Network: http://192.168.x.x:8000/
-```
-
-### Step 5: Open in Browser
-
-Navigate to: **http://localhost:8000/**
-
-You should see the login page.
-
----
-
-## Running Full System (Demo Flow)
-
-### Step-by-Step Execution Order
-
-```
-1. Start SQL Server ────────────────── (already running as Windows service)
-2. Start Backend ─── npm start ──────── (terminal 1)
-3. Start Frontend ── npm run dev ────── (terminal 2)
-4. Open Browser ──── http://localhost:8000
-5. Login ─────────── see Demo Accounts below
-6. Navigate ──────── use sidebar menu
-```
-
-### Full Demo Walkthrough
-
-#### 👤 Customer Flow (15 minutes)
-
-1. **Login** as `customer` / `123456`
-2. **Dashboard** shows wallet balance and navigation
-3. **My Vehicles** → **Add Vehicle** → Enter plate number `59A-12345`, Brand `VinFast`, Model `VF8`
-4. **Stations** → Browse station grid → Click **View Details** on any active station
-5. **Station Detail** → See available charging points → Click **Start Charging** on an available point
-6. **My Sessions** → See the session in active tab → Wait a moment → Click **Stop**
-7. **Wallet** → See balance → **Top Up** with 100,000 VND
-8. **Transactions** → View the wallet top-up transaction
-9. **Profile** → Check your profile info
-
-#### 🔧 Admin Flow (10 minutes)
-
-1. **Logout** → **Login** as `admin` / `123456`
-2. **Dashboard** shows system-wide stats (users, stations, revenue, active sessions)
-3. **Charging Stations** → **+ New Station** → Fill form (Code: `ST011`, Name: `Demo Station`)
-4. **Franchises** → **+ New Franchise** → Add a demo franchise
-5. **Pricing Policies** → View existing policies and rules
-6. **Maintenance** → Schedule a maintenance task
-7. **Alerts** → View open alerts → **Acknowledge** → **Resolve**
-8. **User Management** → See all registered users
-
----
-
-## Demo Accounts
-
-These accounts are created by the seed script and credentials are inserted via `insert_credentials.sql`.
-
-| Username | Password | Role | Description |
-|----------|----------|------|-------------|
-| `admin` | `123456` | SysAdmin | Full system access, all CRUD, user management, dashboards |
-| `operator` | `123456` | Operator | Can manage stations, sessions, pricing, monitoring |
-| `customer` | `123456` | CUSTOMER | Can browse stations, start/stop sessions, manage wallet/vehicles |
-
-### Setup Steps for Demo Accounts
-
-1. **Run database setup:** Execute `database/run_all.sql` in SSMS
-2. **Insert credentials:** Execute `insert_credentials.sql` in SSMS  
-   - This adds the bcrypt-hashed password (`123456`) for all demo users
-   - ⚠️ **This step is required** — without it, login will fail
-3. **Verify:** Run the verification queries in Step 5 of Database Setup section
-4. **Login:** Use username and password `123456` in the frontend
-
-> **Why credentials are separate:**
-> - Seed data creates users with roles defined by business logic
-> - Passwords are hashed with bcrypt (12 salt rounds) for security
-> - This separation prevents accidental exposure of plaintext passwords in version control
-
-> **If login fails:**
-> 1. Verify credentials were inserted: `SELECT COUNT(*) FROM Users.UserCredential WHERE UserID IN (2,3,4)`
-> 2. Check user exists: `SELECT * FROM [Users].[User] WHERE Username = 'admin'`
-> 3. Verify role assignment: `SELECT * FROM Users.UserRole WHERE UserID = 2`
-
----
-
-## API Endpoints Overview
-
-### Authentication
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| POST | `/api/auth/login` | Public |
-| POST | `/api/auth/register` | Public |
-| POST | `/api/auth/refresh` | Public |
-| POST | `/api/auth/logout` | JWT |
-| GET | `/api/auth/profile` | JWT |
-| PUT | `/api/auth/profile` | JWT |
-
-### Dashboard
-| Method | Endpoint | Role |
-|--------|----------|------|
-| GET | `/api/dashboard/admin` | SysAdmin |
-| GET | `/api/dashboard/station/:id` | Any |
-| GET | `/api/dashboard/franchise/:id` | Any |
-
-### Stations & Infrastructure
-| Method | Endpoint | Role |
-|--------|----------|------|
-| GET/POST | `/api/stations` | Any/SysAdmin |
-| GET/PUT/DELETE | `/api/stations/:id` | Any/SysAdmin |
-| GET/POST | `/api/points` | Any |
-| GET/POST | `/api/franchises` | Any/SysAdmin |
-| GET/POST | `/api/station-models` | Any |
-
-### Sessions (Core Business Flow)
-| Method | Endpoint | Role |
-|--------|----------|------|
-| GET | `/api/sessions` | Any |
-| GET | `/api/sessions/my` | Customer |
-| POST | `/api/sessions/start` | Customer |
-| POST | `/api/sessions/:id/end` | Customer |
-| POST | `/api/sessions/:id/cancel` | Customer |
-| GET | `/api/sessions/history` | Customer |
-
-### Payments & Wallet
-| Method | Endpoint | Role |
-|--------|----------|------|
-| POST | `/api/payments/create` | Customer |
-| POST | `/api/payments/refund` | SysAdmin |
-| GET | `/api/wallet/my` | Customer |
-| POST | `/api/wallet/topup` | Customer |
-| GET | `/api/transactions/my` | Customer |
-
-### Management (Admin/Operator)
-| Method | Endpoint | Role |
-|--------|----------|------|
-| GET/POST | `/api/users` | SysAdmin |
-| GET/POST | `/api/pricing-policies` | SysAdmin/Operator |
-| GET/POST | `/api/maintenance-schedules` | SysAdmin/Technician |
-| GET/POST | `/api/alerts` | Any |
-
-Full API documentation with all 200+ endpoints is available in the backend route definitions at `backend/src/routes/index.js`.
-
----
-
-## Common Issues & Fixes
-
-### 1. Database Connection Fails
-
-**Error:** `Login failed for user 'sa'` or `Cannot open database 'EV_Charging_System'`
-
-**Fix:**
-1. Verify SQL Server is running: Open **Services** (Win+R → `services.msc`) → Check `SQL Server (MSSQLSERVER)` is **Running**
-2. Enable SQL Server Authentication:
-   ```sql
-   ALTER LOGIN sa ENABLE;
-   GO
-   ALTER LOGIN sa WITH PASSWORD = 'YourPassword123';
-   GO
-   ```
-3. In SSMS, right-click server → **Properties** → **Security** → Select **SQL Server and Windows Authentication mode**
-4. In `backend/.env`, verify `DB_SERVER`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-
-### 2. Port Conflicts
-
-**Error:** `EADDRINUSE: address already in use :::3000`
-
-**Fix:**
-```bash
-# Find process using port 3000
-netstat -ano | findstr :3000
-
-# Kill the process (replace PID with actual number)
-taskkill /PID <PID> /F
-
-# Or change backend port in .env:
-PORT=3001
-```
-
-### 3. CORS Errors (Frontend can't reach Backend)
-
-**Error in browser console:** `Access to XMLHttpRequest at 'http://localhost:3000/api/...' has been blocked by CORS policy`
-
-**Fix:**
-1. Backend already has CORS enabled (see `backend/src/server.js`)
-2. Verify backend is running on port 3000
-3. If backend is on a different port, update `frontend/src/api.js`:
-   ```javascript
-   baseURL: 'http://localhost:3001/api',
-   ```
-
-### 4. Login Returns 401
-
-**Cause:** User doesn't exist in database or password is incorrect.
-
-**Fix:**
-1. Verify the user exists:
-   ```sql
-   SELECT * FROM [Users].[User] WHERE Username = 'customer';
-   ```
-2. If missing, re-run the seed script or insert manually:
-   ```sql
-   -- Check what seed data was inserted
-   SELECT Username, Email, AccountStatus FROM [Users].[User];
-   ```
-3. Make sure you're using the correct password (`123456` for all demo accounts)
-
-### 5. Token Expired
-
-**Error:** `Invalid or expired token`
-
-**Fix:** Token expires after 8 hours. Login again to get a fresh token.
-
-### 6. "No token provided" When Logged In
-
-**Fix:** Clear localStorage and login again:
-```javascript
-localStorage.clear();
-```
-
----
-
-## Project Folder Structure
-
-```
-├── database/                                    # SQL Server scripts
-│   ├── run_all.sql                              # Master deployment script
-│   ├── schema/
-│   │   ├── 01_CreateDatabase.sql                # DB + 9 schemas
-│   │   └── 02_CreateTables.sql                  # 48 tables + constraints
-│   ├── indexes/03_CreateIndexes.sql             # 40+ indexes
-│   ├── security/04_RBAC_And_Security.sql        # RBAC, RLS, masking
-│   ├── seed/05_SeedData.sql                     # Demo seed data
-│   ├── functions/06_CreateFunctions.sql         # Business functions
-│   ├── procedures/07_CreateStoredProcedures.sql # Stored procedures
-│   ├── triggers/08_CreateTriggers.sql           # Audit triggers
-│   ├── views/09_CreateViews.sql                 # Business views
-│   ├── analytics/10_AnalyticsObjects.sql        # Materialized views + KPI
-│   ├── reporting/11_ReportQueries.sql           # Report queries
-│   └── backup/12_BackupAndDR.sql               # Backup strategy
-│
-├── backend/                                     # Node.js REST API
-│   ├── package.json
-│   ├── .env                                     # Database + JWT config
-│   └── src/
-│       ├── server.js                            # Express entry point
-│       ├── config/database.js                   # MSSQL connection pool
-│       ├── config/auth.js                       # JWT config
-│       ├── middleware/auth.js                   # Auth + RBAC middleware
-│       ├── middleware/errorHandler.js            # Global error handling
-│       ├── models/                              # 48 entity models
-│       │   ├── Infrastructure.js                # 10 entities
-│       │   ├── Access.js                        # 3 entities
-│       │   ├── Users.js                         # 8 entities
-│       │   ├── Operations.js                    # 7 entities
-│       │   ├── Payments.js                      # 9 entities
-│       │   ├── Monitoring.js                    # 5 entities
-│       │   ├── Audit.js                         # 5 entities
-│       │   └── Analytics.js                     # 3 entities
-│       ├── repositories/                        # Data access layer
-│       ├── services/                            # Business logic
-│       │   ├── AuthService.js                   # Auth + JWT
-│       │   ├── ChargingSessionService.js        # Session workflow
-│       │   ├── PaymentService.js                # Payments + wallet
-│       │   └── DashboardService.js              # Aggregations
-│       ├── controllers/                         # Route handlers
-│       └── routes/index.js                     # All 200+ API routes
-│
-├── frontend/                                    # React SPA
-│   ├── package.json
-│   ├── vite.config.js
-│   └── src/
-│       ├── api.js                               # Axios + JWT interceptors
-│       ├── App.jsx                              # Router + layout
-│       ├── styles.css                           # Complete CSS
-│       ├── components/Sidebar.jsx                # Role-based sidebar
-│       └── pages/
-│           ├── LoginPage.jsx                    # JWT login
-│           ├── Dashboard.jsx                    # Role-based dashboards
-│           ├── StationList.jsx                  # Browse stations
-│           ├── StationDetail.jsx                # View + start sessions
-│           ├── StationFormPage.jsx              # Admin create/edit
-│           ├── BookingPage.jsx                  # Active/history sessions
-│           ├── UserProfile.jsx                  # Profile management
-│           ├── WalletPage.jsx                   # Balance + top-up
-│           ├── MyVehicles.jsx                   # Vehicle CRUD
-│           ├── TransactionsPage.jsx              # Transaction history
-│           ├── AdminUsersPage.jsx               # User management
-│           ├── AdminFranchisesPage.jsx           # Franchise CRUD
-│           ├── PricingPoliciesPage.jsx           # Pricing management
-│           ├── MaintenancePage.jsx               # Maintenance scheduling
-│           └── AlertsPage.jsx                   # Alert management
-│
-├── DatabaseAnalysts.md                          # Full DB architecture docs
-└── README.md                                    # This file
-```
-
----
-
-## Notes for Demo / Presentation
-
-### What to Show (15-minute demo script)
-
-| Time | Section | What to Demonstrate |
-|------|---------|-------------------|
-| 0:00 | **Login** | Show login page → Login as `customer` |
-| 0:30 | **Dashboard** | Show wallet balance, quick links |
-| 1:00 | **Add Vehicle** | Go to My Vehicles → Add a new vehicle |
-| 2:00 | **Browse Stations** | Show station list with search, click a station |
-| 3:00 | **Start Charging** | Select an available point → Start session |
-| 4:00 | **Monitor Session** | Show active session in Bookings tab |
-| 5:00 | **Stop Session** | Stop the session → see cost calculation |
-| 6:00 | **Wallet Top-up** | Add funds to wallet |
-| 7:00 | **Transactions** | View transaction history |
-| 8:00 | **Switch to Admin** | Logout → Login as `admin` |
-| 9:00 | **Admin Dashboard** | Show system stats, revenue chart |
-| 10:00 | **Manage Stations** | Create a new station |
-| 11:00 | **Franchises** | View/add franchise |
-| 12:00 | **Pricing** | Show pricing policies |
-| 13:00 | **Maintenance** | Schedule maintenance |
-| 14:00 | **Alerts** | Show alert management |
-| 15:00 | **Q&A** | Accept questions |
-
-### Key Features to Highlight
-
-- **48 database tables** organized into 9 domain schemas — enterprise-grade DB design
-- **JWT Authentication** with role-based access control (SysAdmin / Operator / Customer)
-- **Real business workflows** — start session → end with pricing engine → wallet payment
-- **Dashboard analytics** — admin sees revenue, top stations, daily trends
-- **Clean layered architecture** — controllers → services → repositories → models
-- **Immutable audit trail** — all status changes logged
-
-### Expected System Behavior
-
-- Frontend automatically redirects to login if token is expired
-- Backend returns consistent JSON: `{ success, data, message }`
-- Starting a session changes `ChargingPoint.Status → Busy`, ending it changes back to `Available`
-- Admin dashboard shows real aggregate data from the database
-- All API calls require JWT (except `/auth/login`, `/auth/register`, `/health`)
-- Password hashing uses bcrypt (12 salt rounds)
-
----
-
-## Database ERD Overview (Text)
-
-```
-[Country] ──1:N──► [Region] ──1:N──► [Address]
-                                          │
-                ┌─────────────────────────┤
-                ▼                         ▼
-        [Franchise]               [ChargingStation] ──N:1──► [StationModel]
-                │                         │
-                │                     1:N │
-                │                         ▼
-                │                  [ChargingPoint]
-                │                         │
-                │                     1:N │
-                │                         ▼
-                │                  [ChargingSession] (Central Hub)
-                │                         │
-                └─────────────────N:1─────┘
-                                          │
-                                     1:1  ▼
-                                     [Transaction] ──► [Wallet]
-                                          │
-                                          ▼
-                                      [Invoice]
-```
-
----
-
-## License
-
-This project is created for educational purposes (IE103 — Information Management).
-&copy; 2026
+- `/stations`, `/charging-points`
+- `/sessions`, `/bookings`
+- `/wallets`, `/payments`, `/invoices`, `/refunds`
+- `/franchises`, `/contracts`, `/settlements`
+- `/maintenance`, `/telemetry`
+- `/reports`
+- `/users`, `/roles`
