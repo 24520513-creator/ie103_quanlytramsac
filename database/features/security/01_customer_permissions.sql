@@ -28,6 +28,15 @@ BEGIN CATCH
     SELECT ERROR_MESSAGE() AS ExpectedError;
 END CATCH;
 
+BEGIN TRY
+    SELECT TOP 5 *
+    FROM [Identity].UserAccount;
+END TRY
+BEGIN CATCH
+    PRINT N'Expected error: customer cannot select Identity.UserAccount directly.';
+    SELECT ERROR_MESSAGE() AS ExpectedError;
+END CATCH;
+
 REVERT;
 GO
 

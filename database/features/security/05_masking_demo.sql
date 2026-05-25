@@ -5,6 +5,7 @@ GO
 /*
 HUONG DAN SU DUNG
 - Muc dich: demo dynamic data masking.
+- Chay database/09_Advanced_Security.sql truoc script nay.
 - Khong can sua tham so; mask_viewer la user tam de xem du lieu bi che.
 - Tac dong du lieu: CO THE TAO user database mask_viewer neu chua ton tai; khong sua du lieu nghiep vu.
 */

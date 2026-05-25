@@ -42,17 +42,17 @@ Bang nay dung de tra nhanh tinh nang, role su dung, mo ta ngan va file SQL can m
 | SystemAdmin | Xem tong hop user-role | Xem tai khoan, trang thai va danh sach role. | `system_admin/05_view_user_role_summary.sql` |
 | SystemAdmin | Xem audit log | Kiem tra lich su thay doi du lieu va thao tac quan trong. | `system_admin/06_view_audit_log.sql` |
 | SystemAdmin | Chuan bi backup/restore | Xem cau lenh mau de sao luu va phuc hoi database. | `system_admin/07_backup_restore_demo.sql` |
-| Security | Kiem tra quyen Customer | Customer doc view duoc cap quyen nhung khong doc truc tiep bang payment. | `security/01_customer_permissions.sql` |
-| Security | Kiem tra quyen OperationsStaff | Operator xem du lieu van hanh nhung khong doc truc tiep bang identity. | `security/02_operations_permissions.sql` |
-| Security | Kiem tra quyen BusinessManager | Business manager xem doanh thu nhung khong update truc tiep bang tram. | `security/03_business_permissions.sql` |
-| Security | Kiem tra quyen SystemAdmin | Admin xem user-role va audit log. | `security/04_admin_permissions.sql` |
-| Security | Dynamic data masking | Email, phone va password hash bi che voi user khong co UNMASK. | `security/05_masking_demo.sql` |
-| Security | Row-level security | Customer chi thay phien sac cua minh trong policy tam thoi. | `security/06_row_level_security_demo.sql` |
-| Security | Soft delete | Vo hieu hoa xe bang IsActive thay vi xoa vat ly. | `security/07_soft_delete_demo.sql` |
+| Security core | Kiem tra quyen Customer | Customer doc view duoc cap quyen nhung khong doc truc tiep bang payment/identity. | `security/01_customer_permissions.sql` |
+| Security core | Kiem tra quyen OperationsStaff | Operator xem du lieu van hanh nhung khong doc truc tiep bang identity/payment. | `security/02_operations_permissions.sql` |
+| Security core | Kiem tra quyen BusinessManager | Business manager xem bao cao nhung khong doc/sua truc tiep bang goc nhay cam. | `security/03_business_permissions.sql` |
+| Security core | Kiem tra quyen SystemAdmin | Admin xem user-role va audit log. | `security/04_admin_permissions.sql` |
+| Advanced Security | Dynamic data masking | Email, phone va password hash bi che voi user khong co UNMASK. Chay `09_Advanced_Security.sql` truoc. | `security/05_masking_demo.sql` |
+| Advanced Security | Row-level security | Customer chi thay phien sac cua minh trong policy tam thoi. | `security/06_row_level_security_demo.sql` |
+| Advanced Security | Soft delete | Vo hieu hoa xe bang IsActive thay vi xoa vat ly. | `security/07_soft_delete_demo.sql` |
+| Advanced Security | SQL Authentication login | Tao login that de dang nhap SSMS theo tung role demo. | `security/08_sql_authentication_logins.sql` |
 | Negative test | Booking sai thoi gian | Tu choi booking co BookedFrom khong nho hon BookedTo. | `negative_tests/01_invalid_booking_time.sql` |
 | Negative test | Dat cong da ban | Tu choi booking trung thoi gian tren cung cong sac. | `negative_tests/02_booking_busy_point.sql` |
 | Negative test | Thanh toan trung | Tu choi tao payment lan hai cho session da thanh toan. | `negative_tests/03_duplicate_payment.sql` |
 | Negative test | Ket thuc session hai lan | Tu choi ket thuc lai session da Completed. | `negative_tests/04_end_session_twice.sql` |
 | Negative test | Truy cap trai quyen | Customer bi chan khi doc truc tiep bang identity. | `negative_tests/05_unauthorized_access.sql` |
 | Negative test | Rollback transaction | Loi cuong buc lam thao tac tao du lieu do bi rollback. | `negative_tests/06_transaction_rollback.sql` |
-

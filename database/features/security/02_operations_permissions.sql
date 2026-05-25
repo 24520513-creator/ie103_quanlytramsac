@@ -28,6 +28,15 @@ BEGIN CATCH
     SELECT ERROR_MESSAGE() AS ExpectedError;
 END CATCH;
 
+BEGIN TRY
+    SELECT TOP 5 *
+    FROM Payments.PaymentTransaction;
+END TRY
+BEGIN CATCH
+    PRINT N'Expected error: operations staff cannot select Payments.PaymentTransaction directly.';
+    SELECT ERROR_MESSAGE() AS ExpectedError;
+END CATCH;
+
 REVERT;
 GO
 
