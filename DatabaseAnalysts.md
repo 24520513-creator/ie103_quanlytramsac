@@ -36,7 +36,7 @@ He thong mo phong bai toan quan ly thong tin cho mang tram sac xe dien:
 | Operations Staff | `db_ev_operations_staff` | Quan ly tram/cong sac, session loi, maintenance ticket, telemetry |
 | Business Manager | `db_ev_business_manager` | Xem report, pricing policy, revenue sharing, settlement |
 | Customer | `db_ev_customer` | Xem cong kha dung, quan ly xe, booking, charging session, payment, invoice |
-| Franchise Partner | Khong co database role rieng trong source | Duoc quan ly thong qua bang franchise, contract, policy, settlement |
+| Franchise Partner | `db_ev_franchise_partner` | Xem ho so, hop dong, tram, revenue share policy va settlement cua chinh franchise minh |
 
 ### Main Modules
 
@@ -115,6 +115,7 @@ stateDiagram-v2
 5. `Franchise.sp_CreateRevenueSettlement` tong hop gross revenue tu completed sessions theo franchise va period.
 6. `Franchise.fn_CalculatePartnerShare` tinh partner share; platform share la phan con lai.
 7. `Franchise.RevenueShareSettlement` luu settlement voi status `Approved`.
+8. Franchise Partner dang nhap bang `franchise01..franchise08` va xem ket qua cua minh qua cac AppView `vw_My*` duoc loc theo `ContactUserID`.
 
 ### Reporting Flow
 
@@ -793,12 +794,14 @@ An optional SQL Authentication script, `database/features/security/08_sql_authen
 | `db_ev_operations_staff` | Operator | DML on `Infrastructure`, `Operations`, `Maintenance`; read `AppView`; execute operational procedures |
 | `db_ev_business_manager` | Manager | Read selected reporting views; execute settlement/reporting procedures; no direct payment/identity table access |
 | `db_ev_customer` | Customer | Read customer-facing views; execute vehicle, booking, session, payment and invoice procedures |
+| `db_ev_franchise_partner` | Franchise partner | Read only own franchise profile, contracts, stations, policies and settlements through `AppView` objects |
 
 ### Least Privilege Design
 
 - Customer does not receive direct table access to `[Identity]` or `Payments`; only views and procedures are exposed.
 - Operations staff cannot read identity/payment schemas directly, reducing exposure to sensitive account and financial data.
 - Business manager reads reporting views instead of mutating operational tables.
+- Franchise partner reads only self-service AppView objects filtered through `FranchisePartner.ContactUserID`; it cannot read base franchise, identity, payment or operations tables directly.
 - System admin is broad but still modeled as a database role rather than relying only on `sysadmin`/`db_owner` in the demo.
 
 ### Schema-Level Permissions
@@ -1047,6 +1050,11 @@ The source uses default SQL Server isolation level; no explicit `SERIALIZABLE`, 
 | `vw_RegionRevenue` | Revenue by region |
 | `vw_UserRoleSummary` | Admin user-role summary |
 | `vw_ChargingSessionStatistics` | Session count/kWh/revenue by date and status |
+| `vw_MyFranchiseProfile` | Franchise partner profile for current database user |
+| `vw_MyFranchiseContracts` | Franchise partner contracts for current database user |
+| `vw_MyFranchiseStations` | Franchise partner stations for current database user |
+| `vw_MyRevenueSharePolicies` | Franchise partner revenue share policies for current database user |
+| `vw_MyRevenueShareSettlements` | Franchise partner settlements/profit sharing for current database user |
 | `vw_TopCustomerUsage` | Top customers by completed usage |
 
 ### KPI Examples
@@ -1151,7 +1159,7 @@ Expected result:
 
 | Field | Value |
 |---|---|
-| Actor | Customer, OperationsStaff, BusinessManager, SystemAdmin |
+| Actor | Customer, OperationsStaff, BusinessManager, FranchisePartner, SystemAdmin |
 | Scripts | `database/features/security/01_customer_permissions.sql` to `04_admin_permissions.sql` |
 | Main objects | database roles, `EXECUTE AS USER`, `GRANT`, `DENY` |
 

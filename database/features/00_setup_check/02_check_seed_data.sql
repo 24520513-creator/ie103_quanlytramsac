@@ -18,7 +18,8 @@ UNION ALL SELECT N'Vehicles', COUNT(*) FROM Operations.Vehicle
 UNION ALL SELECT N'Sessions', COUNT(*) FROM Operations.ChargingSession
 UNION ALL SELECT N'Payments', COUNT(*) FROM Payments.PaymentTransaction
 UNION ALL SELECT N'Invoices', COUNT(*) FROM Payments.Invoice
-UNION ALL SELECT N'Maintenance tickets', COUNT(*) FROM Maintenance.MaintenanceTicket;
+UNION ALL SELECT N'Maintenance tickets', COUNT(*) FROM Maintenance.MaintenanceTicket
+UNION ALL SELECT N'Franchise partner users', COUNT(*) FROM [Identity].UserAccount WHERE Username LIKE N'franchise%';
 
 SELECT TOP 10 Username, FullName, AccountStatus
 FROM [Identity].UserAccount
@@ -27,6 +28,14 @@ ORDER BY UserID;
 SELECT TOP 10 StationCode, StationName, StationStatus
 FROM Infrastructure.ChargingStation
 ORDER BY StationID;
+
+SELECT f.FranchiseCode, f.FranchiseName, u.Username AS ContactUsername, r.RoleCode
+FROM Franchise.FranchisePartner f
+JOIN [Identity].UserAccount u ON u.UserID = f.ContactUserID
+JOIN [Identity].UserRole ur ON ur.UserID = u.UserID
+JOIN [Identity].[Role] r ON r.RoleID = ur.RoleID
+WHERE r.RoleCode = N'FranchisePartner'
+ORDER BY f.FranchiseID;
 GO
 
 

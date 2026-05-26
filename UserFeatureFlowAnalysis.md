@@ -4,7 +4,7 @@ Tai lieu nay tong hop cac luong su dung tinh nang cua tung nhom nguoi dung trong
 
 ## 1. Tong quan actor va vai tro
 
-He thong co 4 actor dang nhap chinh va 1 actor nghiep vu dang duoc quan ly duoi dang du lieu:
+He thong co 5 actor dang nhap chinh, trong do Franchise Partner la actor read-only cho dai dien doanh nghiep nhuuong quyen:
 
 | Actor | Database role | User demo | Vai tro chinh |
 |---|---|---|---|
@@ -12,7 +12,7 @@ He thong co 4 actor dang nhap chinh va 1 actor nghiep vu dang duoc quan ly duoi 
 | Operations Staff | `db_ev_operations_staff` | `operator01` | Van hanh tram/cong sac, xu ly loi, quan ly ticket bao tri, xem telemetry |
 | Business Manager | `db_ev_business_manager` | `business01` | Xem bao cao doanh thu, KPI, quan ly gia, chia doanh thu franchise, settlement |
 | System Admin | `db_ev_system_admin` | `admin01` | Quan ly tai khoan, role, audit log, backup/restore demo |
-| Franchise Partner | Chua co role rieng | Khong co | Doi tac nhuuong quyen duoc quan ly qua bang franchise, hop dong va settlement |
+| Franchise Partner | `db_ev_franchise_partner` | `franchise01..franchise08` | Doi tac nhuuong quyen xem ho so, hop dong, tram, policy va settlement cua chinh minh |
 
 Luong tong quat cua he thong:
 
@@ -21,6 +21,7 @@ Customer tao booking va phien sac
 -> Operations Staff giam sat ha tang va xu ly su co
 -> Payments ghi nhan thanh toan va hoa don
 -> Business Manager xem doanh thu, KPI va tao settlement
+-> Franchise Partner xem settlement/profit sharing cua franchise minh
 -> System Admin quan tri user, quyen va audit
 ```
 
@@ -237,7 +238,7 @@ Bang lien quan:
 
 ### 4.1. Muc dich
 
-Business Manager theo doi hieu qua kinh doanh cua he thong: doanh thu, KPI, gio cao diem, tang truong khach hang, tram co doanh thu cao, chinh sach gia, chinh sach chia doanh thu va settlement cho franchise partner.
+Business Manager theo doi hieu qua kinh doanh cua he thong phia cong ty chu quan: doanh thu, KPI, gio cao diem, tang truong khach hang, tram co doanh thu cao, chinh sach gia, chinh sach chia doanh thu va settlement cho nhieu franchise partner.
 
 ### 4.2. Luong su dung chinh
 
@@ -417,9 +418,9 @@ Admin chon UserID va RoleCode
 
 ## 6. Franchise Partner - Doi tac nhuuong quyen
 
-### 6.1. Trang thai trong source hien tai
+### 6.1. Muc dich va pham vi
 
-Franchise Partner co du lieu nghiep vu nhung chua co database role/user rieng de dang nhap. Trong source hien tai, cac thao tac lien quan den franchise duoc Business Manager thuc hien.
+Franchise Partner la nguoi dai dien doanh nghiep nhuuong quyen. Actor nay co database role `db_ev_franchise_partner`, logical role `FranchisePartner` va demo users `franchise01..franchise08`. Pham vi quyen la read-only va duoc loc theo `Franchise.FranchisePartner.ContactUserID`.
 
 ### 6.2. Du lieu lien quan
 
@@ -431,40 +432,41 @@ Franchise Partner co du lieu nghiep vu nhung chua co database role/user rieng de
 | `Franchise.RevenueSharePolicy` | Ty le chia doanh thu |
 | `Franchise.RevenueShareSettlement` | Ket qua doi soat doanh thu |
 
-### 6.3. Luong de xuat neu phat trien actor Franchise Partner
+### 6.3. Luong su dung chinh
 
-Neu sau nay xay backend/frontend va them role rieng cho Franchise Partner, luong hop ly co the la:
+Franchise Partner khong tao settlement va khong cap nhat revenue share policy. Cac thao tac quan ly nay van thuoc Business Manager cua cong ty chu quan.
 
 ```text
 Franchise Partner dang nhap
--> xem danh sach tram thuoc doi tac
--> xem doanh thu theo ky
--> xem settlement da duoc phe duyet
--> xem ty le chia doanh thu dang ap dung
--> tai bao cao profit sharing
+-> AppView loc theo USER_NAME() va ContactUserID
+-> xem ho so franchise cua minh
+-> xem hop dong va tram thuoc franchise
+-> xem revenue share policy dang ap dung
+-> xem settlement/profit sharing da duoc Business Manager tao
 ```
 
 ## 7. Ma tran nguoi dung - tinh nang
 
-| Tinh nang | Customer | Operations Staff | Business Manager | System Admin |
-|---|---:|---:|---:|---:|
-| Xem cong sac kha dung | Co | Co the gian tiep | Khong chinh | Khong chinh |
-| Quan ly xe | Co | Khong | Khong | Khong |
-| Tao/huy booking | Co | Khong | Khong | Khong |
-| Bat dau/ket thuc phien sac | Co | Xu ly loi session | Khong | Khong |
-| Thanh toan/hoa don | Co | Khong | Refund | Khong |
-| Xem trang thai tram/cong | Khong chinh | Co | Xem bao cao | Co the |
-| Cap nhat trang thai tram/cong | Khong | Co | Khong | Co the |
-| Ghi nhan loi/ticket bao tri | Khong | Co | Xem KPI | Co the |
-| Xem telemetry health | Khong | Co | Co the qua report | Co the |
-| Xem doanh thu/KPI | Khong | Mot phan van hanh | Co | Co the |
-| Quan ly pricing policy | Khong | Khong | Co | Co the |
-| Quan ly revenue share | Khong | Khong | Co | Co the |
-| Tao settlement | Khong | Khong | Co | Co the |
-| Hoan tien | Khong | Khong | Co | Co the |
-| Quan ly user/role | Khong | Khong | Khong | Co |
-| Xem audit log | Khong | Khong | Khong | Co |
-| Backup/restore demo | Khong | Khong | Khong | Co |
+| Tinh nang | Customer | Operations Staff | Business Manager | Franchise Partner | System Admin |
+|---|---:|---:|---:|---:|---:|
+| Xem cong sac kha dung | Co | Co the gian tiep | Khong chinh | Tram cua minh | Khong chinh |
+| Quan ly xe | Co | Khong | Khong | Khong | Khong |
+| Tao/huy booking | Co | Khong | Khong | Khong | Khong |
+| Bat dau/ket thuc phien sac | Co | Xu ly loi session | Khong | Khong | Khong |
+| Thanh toan/hoa don | Co | Khong | Refund | Khong | Khong |
+| Xem trang thai tram/cong | Khong chinh | Co | Xem bao cao | Tram cua minh | Co the |
+| Cap nhat trang thai tram/cong | Khong | Co | Khong | Khong | Co the |
+| Ghi nhan loi/ticket bao tri | Khong | Co | Xem KPI | Khong | Co the |
+| Xem telemetry health | Khong | Co | Co the qua report | Khong | Co the |
+| Xem doanh thu/KPI | Khong | Mot phan van hanh | Co toan he thong | Cua minh | Co the |
+| Quan ly pricing policy | Khong | Khong | Co | Khong | Co the |
+| Quan ly revenue share | Khong | Khong | Co | Chi xem cua minh | Co the |
+| Tao settlement | Khong | Khong | Co | Khong | Co the |
+| Xem settlement/profit sharing | Khong | Khong | Co toan he thong | Cua minh | Co the |
+| Hoan tien | Khong | Khong | Co | Khong | Co the |
+| Quan ly user/role | Khong | Khong | Khong | Khong | Co |
+| Xem audit log | Khong | Khong | Khong | Khong | Co |
+| Backup/restore demo | Khong | Khong | Khong | Khong | Co |
 
 ## 8. Ma tran tinh nang - database object
 
@@ -479,6 +481,7 @@ Franchise Partner dang nhap
 | Telemetry | `Infrastructure.PointTelemetry` | `AppView.sp_GetTelemetryHealth` |
 | Bao tri | `Maintenance.sp_ReportError`, `Maintenance.sp_ScheduleMaintenance`, `Maintenance.sp_AssignTicket`, `Maintenance.sp_CloseTicket` | `AppView.vw_MaintenanceKPI` |
 | Bao cao doanh thu | `Operations.ChargingSession`, `Payments.PaymentTransaction` | `AppView.vw_StationRevenueDaily`, `AppView.vw_RegionRevenue`, `AppView.vw_TopRevenueStations` |
+| Franchise partner self-service | `Franchise.FranchisePartner.ContactUserID`, `Franchise.FranchiseContract`, `Franchise.RevenueShareSettlement` | `AppView.vw_MyFranchiseProfile`, `AppView.vw_MyFranchiseContracts`, `AppView.vw_MyFranchiseStations`, `AppView.vw_MyRevenueSharePolicies`, `AppView.vw_MyRevenueShareSettlements` |
 | Franchise settlement | `Franchise.sp_CreateRevenueSettlement`, `Franchise.fn_CalculatePartnerShare` | `AppView.vw_ProfitSharing`, `AppView.sp_GetFranchiseProfitSharing` |
 | Quan tri user | `[Identity].sp_CreateUser`, `[Identity].sp_AssignRole`, `[Identity].sp_RemoveRole` | `AppView.vw_UserRoleSummary` |
 | Audit | Trigger va procedure ghi `Audit.AuditLog` | `Audit.AuditLog` |
@@ -535,11 +538,12 @@ System Admin tao user/gan role
 
 ## 10. Ket luan
 
-He thong `EV_Charging_System` duoc chia tinh nang ro theo 4 nhom nguoi dung chinh:
+He thong `EV_Charging_System` duoc chia tinh nang ro theo 5 nhom nguoi dung chinh:
 
 - Customer tap trung vao hanh trinh su dung dich vu sac xe: xem cong, quan ly xe, booking, session, payment va invoice.
 - Operations Staff tap trung vao on dinh ha tang: trang thai tram/cong, session loi, telemetry, error log va maintenance ticket.
 - Business Manager tap trung vao dieu hanh kinh doanh: doanh thu, KPI, pricing policy, revenue share policy, settlement va refund.
+- Franchise Partner tap trung vao self-service read-only: xem ho so, hop dong, tram, policy va settlement cua chinh doanh nghiep nhuuong quyen.
 - System Admin tap trung vao quan tri he thong: user, role, password, account status, audit va backup/restore.
 
 Thiet ke database phan tach tot giua luong giao dich, luong bao cao va luong quan tri. Stored procedure dam nhiem xu ly nghiep vu, view dam nhiem lop doc/bao cao, trigger dam nhiem audit va lich su trang thai, con security script dam bao moi role chi co quyen phu hop voi nhiem vu cua minh.

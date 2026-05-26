@@ -133,7 +133,7 @@ Nguồn: `database/02_Create_Tables.sql`.
 | Operations Staff | Có database role `db_ev_operations_staff`; có user demo `operator01`; có logical role `OperationsStaff` | Vận hành trạm, cổng sạc, session lỗi, telemetry, maintenance |
 | Business Manager | Có database role `db_ev_business_manager`; có user demo `business01`; có logical role `BusinessManager` | Xem báo cáo, tạo settlement, cập nhật revenue share policy |
 | Customer | Có database role `db_ev_customer`; có user demo `customer01`; có logical role `Customer` | Quản lý xe, booking, phiên sạc, thanh toán, hóa đơn |
-| Franchise Partner | Có bảng `Franchise.FranchisePartner`; chưa thấy database role/user riêng | Được quản lý như đối tượng dữ liệu, không phải actor đăng nhập riêng trong security script |
+| Franchise Partner | Có bảng `Franchise.FranchisePartner`; có database role `db_ev_franchise_partner`; có user demo `franchise01..franchise08`; có logical role `FranchisePartner` | Actor read-only cho đối tác nhượng quyền, chỉ xem dữ liệu franchise của chính mình qua AppView |
 
 ## 3.2. Database role được tạo trong security script
 
@@ -143,6 +143,7 @@ Nguồn: `database/02_Create_Tables.sql`.
 | `db_ev_operations_staff` | `operator01` | `database/08_Create_Security.sql` |
 | `db_ev_business_manager` | `business01` | `database/08_Create_Security.sql` |
 | `db_ev_customer` | `customer01` | `database/08_Create_Security.sql` |
+| `db_ev_franchise_partner` | `franchise01..franchise08` | `database/08_Create_Security.sql` |
 
 # 4. Phân tích tính năng theo role
 
@@ -317,16 +318,17 @@ Customer đại diện cho người dùng sử dụng dịch vụ sạc xe đi�
 
 ### Mục đích
 
-Franchise Partner là doanh nghiệp nhượng quyền/sở hữu hoặc vận hành trạm sạc. Trong source hiện tại, franchise partner là dữ liệu nghiệp vụ trong schema `Franchise`, chưa thấy database role, user login hoặc script demo riêng cho actor này.
+Franchise Partner là doanh nghiệp nhượng quyền/sở hữu hoặc vận hành trạm sạc. Trong source hiện tại, actor này có database role `db_ev_franchise_partner`, logical role `FranchisePartner`, demo users `franchise01..franchise08` và chỉ xem dữ liệu của chính franchise được map qua `Franchise.FranchisePartner.ContactUserID`.
 
 ### Tính năng chính
 
 | STT | Tính năng | Mô tả nghiệp vụ | Bảng liên quan | View/Procedure/Function/Trigger liên quan | Quyền cần có | Nguồn |
 |---:|---|---|---|---|---|---|
-| 1 | Lưu thông tin đối tác | Quản lý mã, tên, mã số thuế, liên hệ | `Franchise.FranchisePartner` | Chưa thấy procedure CRUD riêng | Chưa có role riêng | `database/02_Create_Tables.sql` |
-| 2 | Lưu hợp đồng | Quản lý thời hạn và tỷ lệ chia cơ bản | `Franchise.FranchiseContract` | Chưa thấy procedure CRUD riêng | Chưa có role riêng | `database/02_Create_Tables.sql` |
-| 3 | Gắn trạm với franchise | Liên kết trạm với partner/contract | `Franchise.FranchiseStation`, `Infrastructure.ChargingStation` | Seed data insert trực tiếp | Chưa có role riêng | `database/09_Seed_Demo_Data.sql` |
-| 4 | Xem kết quả chia doanh thu | Xem settlement đã tạo | `RevenueShareSettlement`, `FranchisePartner`, `FranchiseContract` | `AppView.vw_ProfitSharing`, `AppView.sp_GetFranchiseProfitSharing` | Hiện grant cho Business Manager, chưa có role Franchise Partner | `database/07_Create_AppViews.sql` |
+| 1 | Xem thông tin đối tác | Xem mã, tên, mã số thuế, liên hệ của franchise mình | `Franchise.FranchisePartner` | `AppView.vw_MyFranchiseProfile`, `AppView.sp_GetMyFranchiseProfile` | `db_ev_franchise_partner` read-only | `database/features/franchise_partner/01_view_my_profile.sql` |
+| 2 | Xem hợp đồng | Xem thời hạn và tỷ lệ chia cơ bản của hợp đồng thuộc franchise mình | `Franchise.FranchiseContract` | `AppView.vw_MyFranchiseContracts`, `AppView.sp_GetMyFranchiseContracts` | `db_ev_franchise_partner` read-only | `database/features/franchise_partner/02_view_my_contracts.sql` |
+| 3 | Xem trạm thuộc franchise | Xem station mapping và thông tin trạm của franchise mình | `Franchise.FranchiseStation`, `Infrastructure.ChargingStation` | `AppView.vw_MyFranchiseStations`, `AppView.sp_GetMyFranchiseStations` | `db_ev_franchise_partner` read-only | `database/features/franchise_partner/03_view_my_stations.sql` |
+| 4 | Xem revenue share policy | Xem tỷ lệ chia doanh thu đang áp dụng cho franchise mình | `Franchise.RevenueSharePolicy` | `AppView.vw_MyRevenueSharePolicies`, `AppView.sp_GetMyRevenueSharePolicies` | `db_ev_franchise_partner` read-only | `database/features/franchise_partner/04_view_my_revenue_share_policy.sql` |
+| 5 | Xem settlement/profit sharing | Xem settlement đã được Business Manager tạo | `RevenueShareSettlement`, `FranchisePartner`, `FranchiseContract` | `AppView.vw_MyRevenueShareSettlements`, `AppView.sp_GetMyRevenueShareSettlements` | `db_ev_franchise_partner` read-only | `database/features/franchise_partner/05_view_my_settlements.sql` |
 
 ### Luồng thao tác tiêu biểu
 
@@ -335,17 +337,19 @@ Franchise Partner là doanh nghiệp nhượng quyền/sở hữu hoặc vận h
 3. Seed data tạo `Franchise.RevenueSharePolicy`.
 4. Station được gắn với partner qua `Infrastructure.ChargingStation.FranchiseID` và `Franchise.FranchiseStation`.
 5. Business Manager tạo settlement bằng `Franchise.sp_CreateRevenueSettlement`.
-6. Franchise Partner chưa có luồng đăng nhập/đọc dữ liệu riêng trong security script.
+6. Franchise Partner đăng nhập bằng `franchise01..franchise08` và xem dữ liệu của mình qua các AppView `vw_My*`.
 
 ### Gợi ý demo
 
-Vì chưa có role riêng, nên demo franchise thông qua Business Manager:
+Demo franchise tách thành hai phần: Business Manager tạo settlement toàn hệ thống, Franchise Partner chỉ xem phần của mình:
 
 | Bước | Script |
 |---:|---|
 | 1 | `business_manager/07_create_revenue_settlement.sql` |
 | 2 | `business_manager/08_view_franchise_profit.sql` |
-| 3 | Trình bày rõ: Franchise Partner là đối tượng dữ liệu, không phải principal bảo mật trong source hiện tại |
+| 3 | `franchise_partner/01_view_my_profile.sql` |
+| 4 | `franchise_partner/05_view_my_settlements.sql` |
+| 5 | `security/09_franchise_partner_permissions.sql` |
 
 # 5. Phân tích tính năng theo module hệ thống
 
@@ -385,9 +389,9 @@ Ký hiệu: `C` = Create, `R` = Read, `U` = Update, `D` = Delete, `EXEC` = đư�
 | Phiên sạc | C/R/U/D/EXEC | C/R/U/EXEC | VIEW báo cáo | EXEC/VIEW | - | Operations có thể mark failed |
 | Thanh toán | C/R/U/D/EXEC | DENY | DENY direct; refund script có nhưng chưa grant EXEC trong security core | EXEC create payment | - | Business Manager không được đọc trực tiếp `Payments` |
 | Hóa đơn | C/R/U/D/EXEC | DENY | DENY direct | EXEC/VIEW | - | Customer xem qua `vw_InvoiceDetail` |
-| Franchise partner/contract | C/R/U/D/EXEC | - | R/EXEC settlement-policy | - | - | Chưa có role Franchise Partner |
-| Revenue share policy | C/R/U/D/EXEC | - | EXEC update policy | - | - | Grant trong security core |
-| Revenue settlement | C/R/U/D/EXEC | - | EXEC/VIEW | - | - | Grant trong security core |
+| Franchise partner/contract | C/R/U/D/EXEC | - | R/EXEC settlement-policy | - | VIEW own | Franchise Partner xem qua `AppView.vw_MyFranchiseProfile`, `vw_MyFranchiseContracts`, `vw_MyFranchiseStations` |
+| Revenue share policy | C/R/U/D/EXEC | - | EXEC update policy | - | VIEW own | Franchise Partner chỉ xem policy của mình |
+| Revenue settlement | C/R/U/D/EXEC | - | EXEC/VIEW all | - | VIEW own | Business Manager tạo settlement; Franchise Partner xem settlement của mình |
 | Telemetry | C/R/U/D | R/EXEC report | VIEW KPI gián tiếp | - | - | Operations xem `sp_GetTelemetryHealth` |
 | Maintenance/lỗi | C/R/U/D/EXEC | C/R/U/EXEC | VIEW KPI | - | - | Manager không được mutate Maintenance |
 | Báo cáo/thống kê | R/EXEC | VIEW/EXEC một số report | VIEW/EXEC report kinh doanh | VIEW/EXEC customer usage | - | AppView là read model |
@@ -705,13 +709,15 @@ User `WITHOUT LOGIN` giúp demo bằng `EXECUTE AS USER` trong SSMS mà không c
 | `db_ev_operations_staff` | `SELECT, INSERT, UPDATE` trên `Infrastructure`, `Operations`, `Maintenance`; `SELECT AppView`; `EXECUTE` trên các schema vận hành | DENY direct DML/SELECT trên `Payments`, `[Identity]` |
 | `db_ev_business_manager` | SELECT các reporting views; EXEC settlement/report procedures | DENY direct DML/SELECT trên `[Identity]`, `Payments`; DENY INSERT/UPDATE/DELETE trên `Infrastructure`, `Operations`, `Maintenance` |
 | `db_ev_customer` | SELECT customer views; EXEC vehicle, booking, session, payment, invoice procedures | DENY direct DML/SELECT trên `Payments`, `[Identity]` |
+| `db_ev_franchise_partner` | SELECT/EXEC các AppView `vw_My*`/`sp_GetMy*` cho franchise của mình | DENY direct DML/SELECT trên `[Identity]`, `Payments`, `Franchise`, `Infrastructure`, `Operations`, `Maintenance` |
 
 ## 12.3. Bảng nhạy cảm bị chặn
 
 | Bảng/schema | Role bị chặn | Lý do |
 |---|---|---|
-| `[Identity]` schema | Customer, Operations Staff, Business Manager | Chứa email, phone, password hash, trạng thái tài khoản |
-| `Payments` schema | Customer, Operations Staff, Business Manager | Chứa giao dịch, amount, provider reference, invoice |
+| `[Identity]` schema | Customer, Operations Staff, Business Manager, Franchise Partner | Chứa email, phone, password hash, trạng thái tài khoản |
+| `Payments` schema | Customer, Operations Staff, Business Manager, Franchise Partner | Chứa giao dịch, amount, provider reference, invoice |
+| `Franchise` schema | Franchise Partner | Đối tác chỉ xem dữ liệu của mình qua AppView, không đọc toàn bộ bảng franchise |
 | `Infrastructure` mutation | Business Manager | Manager chỉ nên xem báo cáo, không vận hành thiết bị |
 | `Operations` mutation | Business Manager | Manager không trực tiếp sửa session/booking |
 | `Maintenance` mutation | Business Manager | Manager xem KPI, không xử lý ticket |
@@ -725,6 +731,7 @@ User `WITHOUT LOGIN` giúp demo bằng `EXECUTE AS USER` trong SSMS mà không c
 | Customer tạo payment | `Payments.PaymentTransaction` | `Payments.sp_CreatePayment` |
 | Business Manager xem payment summary | `Payments.PaymentTransaction` | `AppView.vw_PaymentSummary`, `AppView.sp_GetPaymentSummary` |
 | Business Manager xem revenue | `Operations.ChargingSession` | `AppView.vw_StationRevenueDaily`, `vw_TopRevenueStations`, `sp_GetStationRevenue` |
+| Franchise Partner xem dữ liệu của mình | `Franchise`, `Infrastructure`, `Operations` base tables | `AppView.vw_MyFranchiseProfile`, `vw_MyFranchiseContracts`, `vw_MyFranchiseStations`, `vw_MyRevenueSharePolicies`, `vw_MyRevenueShareSettlements` |
 | Operations Staff xem active sessions | `Operations.ChargingSession` | `AppView.vw_ActiveChargingSessions` |
 
 ## 12.5. Least Privilege
@@ -782,4 +789,3 @@ Kết luận: RLS có trong demo script, nhưng chưa phải một phần cài �
 | Viết kết luận về giới hạn hiện tại | Các ghi chú trong phần 4, 10, 12 |
 
 Khi dùng tài liệu này để viết báo cáo, nên nhấn mạnh rằng hệ thống hiện tại là **database-centric**: các tính năng nghiệp vụ được thể hiện qua stored procedure, view, trigger, security script và demo SQL trong SSMS. Không nên mô tả các tính năng frontend/backend nếu không bổ sung source tương ứng, vì repository hiện tại chưa chứa các phần đó.
-

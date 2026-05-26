@@ -6,7 +6,7 @@ HUONG DAN SU DUNG
 - Muc dich: tao du lieu lon nhu he thong da hoat dong gan 2 nam.
 - Chay sau cac script 00 -> 08.
 - Du lieu tao ra:
-  + 20 nhan su/quan tri/kinh doanh/van hanh va 500 customer.
+  + 20 nhan su/quan tri/kinh doanh/van hanh, 8 franchise partner user va 500 customer.
   + 12 tinh/thanh lon, 8 doi tac franchise, 60 tram sac, 300 cong sac.
   + 120000 charging sessions trong khoang 2024-05-15 den 2026-05-13.
   + Booking, payment, invoice, telemetry, error log, maintenance ticket va settlement theo quy mo lon.
@@ -66,6 +66,7 @@ VALUES
 (N'SystemAdmin', N'System administrator', N'Full database administration role'),
 (N'OperationsStaff', N'Operations staff', N'Operates stations, charging points, sessions, errors, and tickets'),
 (N'BusinessManager', N'Business manager', N'Views revenue, manages pricing, franchise settlement, and KPI datasets'),
+(N'FranchisePartner', N'Franchise partner', N'Reads own franchise profile, contracts, stations, policies, and settlements'),
 (N'Customer', N'Customer', N'Owns vehicles, books charging, starts sessions, pays, and views history');
 
 INSERT INTO [Identity].UserAccount (Username, Email, Phone, PasswordHash, FullName)
@@ -93,6 +94,19 @@ VALUES
 
 WITH N AS
 (
+    SELECT TOP (8) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
+    FROM sys.all_objects
+)
+INSERT INTO [Identity].UserAccount (Username, Email, Phone, PasswordHash, FullName)
+SELECT N'franchise' + RIGHT(N'00' + CAST(n AS NVARCHAR(10)), 2),
+       N'franchise' + RIGHT(N'00' + CAST(n AS NVARCHAR(10)), 2) + N'@ev.vn',
+       N'093' + RIGHT(N'0000000' + CAST(n AS NVARCHAR(10)), 7),
+       @Hash,
+       N'Franchise Partner User ' + RIGHT(N'00' + CAST(n AS NVARCHAR(10)), 2)
+FROM N;
+
+WITH N AS
+(
     SELECT TOP (500) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
     FROM sys.all_objects a CROSS JOIN sys.all_objects b
 )
@@ -115,6 +129,7 @@ JOIN [Identity].[Role] r ON r.RoleCode =
         WHEN u.Username LIKE N'admin%' THEN N'SystemAdmin'
         WHEN u.Username LIKE N'operator%' THEN N'OperationsStaff'
         WHEN u.Username LIKE N'business%' THEN N'BusinessManager'
+        WHEN u.Username LIKE N'franchise%' THEN N'FranchisePartner'
         ELSE N'Customer'
     END;
 
@@ -124,7 +139,7 @@ SELECT N'FRC' + RIGHT(N'00' + CAST(n.n AS NVARCHAR(10)), 2),
        N'EV Franchise Partner ' + CAST(n.n AS NVARCHAR(10)),
        N'TAX2026' + RIGHT(N'00' + CAST(n.n AS NVARCHAR(10)), 2),
        n.n,
-       (SELECT TOP 1 UserID FROM [Identity].UserAccount WHERE Username = N'business' + RIGHT(N'00' + CAST(((n.n - 1) % 5) + 1 AS NVARCHAR(10)), 2)),
+       (SELECT TOP 1 UserID FROM [Identity].UserAccount WHERE Username = N'franchise' + RIGHT(N'00' + CAST(n.n AS NVARCHAR(10)), 2)),
        N'Partner Contact ' + CAST(n.n AS NVARCHAR(10)),
        N'092' + RIGHT(N'0000000' + CAST(n.n AS NVARCHAR(10)), 7),
        N'partner' + CAST(n.n AS NVARCHAR(10)) + N'@ev.vn'

@@ -44,6 +44,8 @@ Customer
         └── AppView.vw_InvoiceDetail
 ```
 
+Luu y trien khai: Franchise Partner khong duoc grant truc tiep cac bang goc trong cay tren. Cac nhanh doc du lieu duoc expose bang `AppView.vw_MyFranchiseProfile`, `AppView.vw_MyFranchiseContracts`, `AppView.vw_MyFranchiseStations`, `AppView.vw_MyRevenueSharePolicies`, `AppView.vw_MyRevenueShareSettlements` va cac procedure `sp_GetMy*` tuong ung.
+
 ### Phan tich nhanh
 
 Customer la nguoi dung cuoi cua he thong. Cac nhanh tinh nang cua Customer tap trung vao hanh trinh su dung dich vu sac xe: tim cong sac, quan ly xe, dat lich, thuc hien phien sac, thanh toan va xem hoa don.
@@ -172,7 +174,7 @@ Database object cua System Admin nam chu yeu trong schema `[Identity]`, `Audit` 
 
 ## 5. Franchise Partner
 
-Trong source hien tai, Franchise Partner co du lieu nghiep vu nhung chua co database role/user rieng de dang nhap. Cac thao tac lien quan den franchise dang duoc Business Manager thuc hien. Tuy nhien, neu phat trien thanh actor rieng, cay tinh nang co the duoc thiet ke nhu sau:
+Franchise Partner la actor dang nhap rieng cho nguoi dai dien doanh nghiep nhuuong quyen. Khac voi Business Manager cua cong ty chu quan, Franchise Partner chi duoc xem du lieu thuoc franchise cua minh thong qua cac AppView loc theo `Franchise.FranchisePartner.ContactUserID`.
 
 ```text
 Franchise Partner
@@ -199,7 +201,7 @@ Franchise Partner
 
 ### Phan tich nhanh
 
-Franchise Partner hien tai la thuc the du lieu, khong phai user dang nhap rieng trong security script. Neu mo rong he thong, role nay nen chi co quyen xem du lieu lien quan den chinh doi tac do: thong tin doi tac, hop dong, tram thuoc doi tac, policy chia doanh thu va settlement.
+Franchise Partner co database role `db_ev_franchise_partner`, logical role `FranchisePartner` va demo users `franchise01..franchise08`. Role nay la read-only: xem ho so, hop dong, tram, policy chia doanh thu va settlement cua chinh franchise minh; khong duoc tao settlement hoac cap nhat revenue share policy.
 
 ## 6. Prompt mau de AI generate diagram
 

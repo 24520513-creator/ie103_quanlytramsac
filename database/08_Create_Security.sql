@@ -18,12 +18,21 @@ IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'db_ev_system
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'db_ev_operations_staff') CREATE ROLE db_ev_operations_staff;
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'db_ev_business_manager') CREATE ROLE db_ev_business_manager;
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'db_ev_customer') CREATE ROLE db_ev_customer;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'db_ev_franchise_partner') CREATE ROLE db_ev_franchise_partner;
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'admin01') CREATE USER admin01 WITHOUT LOGIN;
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'operator01') CREATE USER operator01 WITHOUT LOGIN;
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'business01') CREATE USER business01 WITHOUT LOGIN;
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'customer01') CREATE USER customer01 WITHOUT LOGIN;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'franchise01') CREATE USER franchise01 WITHOUT LOGIN;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'franchise02') CREATE USER franchise02 WITHOUT LOGIN;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'franchise03') CREATE USER franchise03 WITHOUT LOGIN;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'franchise04') CREATE USER franchise04 WITHOUT LOGIN;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'franchise05') CREATE USER franchise05 WITHOUT LOGIN;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'franchise06') CREATE USER franchise06 WITHOUT LOGIN;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'franchise07') CREATE USER franchise07 WITHOUT LOGIN;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'franchise08') CREATE USER franchise08 WITHOUT LOGIN;
 GO
 
 IF NOT EXISTS (
@@ -57,6 +66,70 @@ IF NOT EXISTS (
       AND member_principal_id = USER_ID(N'customer01')
 )
     ALTER ROLE db_ev_customer ADD MEMBER customer01;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.database_role_members
+    WHERE role_principal_id = USER_ID(N'db_ev_franchise_partner')
+      AND member_principal_id = USER_ID(N'franchise01')
+)
+    ALTER ROLE db_ev_franchise_partner ADD MEMBER franchise01;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.database_role_members
+    WHERE role_principal_id = USER_ID(N'db_ev_franchise_partner')
+      AND member_principal_id = USER_ID(N'franchise02')
+)
+    ALTER ROLE db_ev_franchise_partner ADD MEMBER franchise02;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.database_role_members
+    WHERE role_principal_id = USER_ID(N'db_ev_franchise_partner')
+      AND member_principal_id = USER_ID(N'franchise03')
+)
+    ALTER ROLE db_ev_franchise_partner ADD MEMBER franchise03;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.database_role_members
+    WHERE role_principal_id = USER_ID(N'db_ev_franchise_partner')
+      AND member_principal_id = USER_ID(N'franchise04')
+)
+    ALTER ROLE db_ev_franchise_partner ADD MEMBER franchise04;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.database_role_members
+    WHERE role_principal_id = USER_ID(N'db_ev_franchise_partner')
+      AND member_principal_id = USER_ID(N'franchise05')
+)
+    ALTER ROLE db_ev_franchise_partner ADD MEMBER franchise05;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.database_role_members
+    WHERE role_principal_id = USER_ID(N'db_ev_franchise_partner')
+      AND member_principal_id = USER_ID(N'franchise06')
+)
+    ALTER ROLE db_ev_franchise_partner ADD MEMBER franchise06;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.database_role_members
+    WHERE role_principal_id = USER_ID(N'db_ev_franchise_partner')
+      AND member_principal_id = USER_ID(N'franchise07')
+)
+    ALTER ROLE db_ev_franchise_partner ADD MEMBER franchise07;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.database_role_members
+    WHERE role_principal_id = USER_ID(N'db_ev_franchise_partner')
+      AND member_principal_id = USER_ID(N'franchise08')
+)
+    ALTER ROLE db_ev_franchise_partner ADD MEMBER franchise08;
 GO
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::Core TO db_ev_system_admin;
@@ -122,6 +195,24 @@ GRANT EXECUTE ON OBJECT::Payments.sp_CreatePayment TO db_ev_customer;
 GRANT EXECUTE ON OBJECT::Payments.sp_CreateInvoice TO db_ev_customer;
 DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::Payments TO db_ev_customer;
 DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[Identity] TO db_ev_customer;
+GO
+
+GRANT SELECT ON OBJECT::AppView.vw_MyFranchiseProfile TO db_ev_franchise_partner;
+GRANT SELECT ON OBJECT::AppView.vw_MyFranchiseContracts TO db_ev_franchise_partner;
+GRANT SELECT ON OBJECT::AppView.vw_MyFranchiseStations TO db_ev_franchise_partner;
+GRANT SELECT ON OBJECT::AppView.vw_MyRevenueSharePolicies TO db_ev_franchise_partner;
+GRANT SELECT ON OBJECT::AppView.vw_MyRevenueShareSettlements TO db_ev_franchise_partner;
+GRANT EXECUTE ON OBJECT::AppView.sp_GetMyFranchiseProfile TO db_ev_franchise_partner;
+GRANT EXECUTE ON OBJECT::AppView.sp_GetMyFranchiseContracts TO db_ev_franchise_partner;
+GRANT EXECUTE ON OBJECT::AppView.sp_GetMyFranchiseStations TO db_ev_franchise_partner;
+GRANT EXECUTE ON OBJECT::AppView.sp_GetMyRevenueSharePolicies TO db_ev_franchise_partner;
+GRANT EXECUTE ON OBJECT::AppView.sp_GetMyRevenueShareSettlements TO db_ev_franchise_partner;
+DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::[Identity] TO db_ev_franchise_partner;
+DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::Payments TO db_ev_franchise_partner;
+DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::Franchise TO db_ev_franchise_partner;
+DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::Infrastructure TO db_ev_franchise_partner;
+DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::Operations TO db_ev_franchise_partner;
+DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::Maintenance TO db_ev_franchise_partner;
 GO
 
 PRINT N'08 - Core security roles, users, GRANT and DENY permissions created.';

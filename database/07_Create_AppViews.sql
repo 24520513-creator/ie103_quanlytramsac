@@ -84,6 +84,106 @@ JOIN Franchise.FranchisePartner f ON f.FranchiseID = rs.FranchiseID
 JOIN Franchise.FranchiseContract fc ON fc.ContractID = rs.ContractID;
 GO
 
+CREATE OR ALTER VIEW AppView.vw_MyFranchiseProfile
+AS
+SELECT
+    f.FranchiseID,
+    f.FranchiseCode,
+    f.FranchiseName,
+    f.TaxCode,
+    f.ContactPerson,
+    f.ContactPhone,
+    f.ContactEmail,
+    f.PartnerStatus,
+    a.FullAddress
+FROM Franchise.FranchisePartner f
+JOIN [Identity].UserAccount u ON u.UserID = f.ContactUserID
+LEFT JOIN Core.Address a ON a.AddressID = f.AddressID
+WHERE u.Username = USER_NAME();
+GO
+
+CREATE OR ALTER VIEW AppView.vw_MyFranchiseContracts
+AS
+SELECT
+    fc.ContractID,
+    f.FranchiseCode,
+    f.FranchiseName,
+    fc.ContractCode,
+    fc.StartDate,
+    fc.EndDate,
+    fc.BaseRevenueShareRate,
+    fc.ContractStatus
+FROM Franchise.FranchiseContract fc
+JOIN Franchise.FranchisePartner f ON f.FranchiseID = fc.FranchiseID
+JOIN [Identity].UserAccount u ON u.UserID = f.ContactUserID
+WHERE u.Username = USER_NAME();
+GO
+
+CREATE OR ALTER VIEW AppView.vw_MyFranchiseStations
+AS
+SELECT
+    fs.FranchiseID,
+    f.FranchiseCode,
+    f.FranchiseName,
+    fs.StationID,
+    s.StationCode,
+    s.StationName,
+    s.MaxPowerKW,
+    s.StationStatus,
+    fc.ContractCode,
+    a.FullAddress
+FROM Franchise.FranchiseStation fs
+JOIN Franchise.FranchisePartner f ON f.FranchiseID = fs.FranchiseID
+JOIN [Identity].UserAccount u ON u.UserID = f.ContactUserID
+JOIN Infrastructure.ChargingStation s ON s.StationID = fs.StationID
+JOIN Franchise.FranchiseContract fc ON fc.ContractID = fs.ContractID
+LEFT JOIN Core.Address a ON a.AddressID = s.AddressID
+WHERE u.Username = USER_NAME();
+GO
+
+CREATE OR ALTER VIEW AppView.vw_MyRevenueSharePolicies
+AS
+SELECT
+    rsp.RevenueSharePolicyID,
+    f.FranchiseCode,
+    f.FranchiseName,
+    fc.ContractCode,
+    rsp.PolicyCode,
+    rsp.PartnerShareRate,
+    rsp.PlatformShareRate,
+    rsp.AppliedFrom,
+    rsp.AppliedTo,
+    rsp.IsActive
+FROM Franchise.RevenueSharePolicy rsp
+JOIN Franchise.FranchiseContract fc ON fc.ContractID = rsp.ContractID
+JOIN Franchise.FranchisePartner f ON f.FranchiseID = fc.FranchiseID
+JOIN [Identity].UserAccount u ON u.UserID = f.ContactUserID
+WHERE u.Username = USER_NAME();
+GO
+
+CREATE OR ALTER VIEW AppView.vw_MyRevenueShareSettlements
+AS
+SELECT
+    rs.SettlementID,
+    rs.SettlementCode,
+    f.FranchiseCode,
+    f.FranchiseName,
+    fc.ContractCode,
+    rs.PeriodStart,
+    rs.PeriodEnd,
+    rs.GrossRevenue,
+    rs.PartnerShareAmount,
+    rs.PlatformShareAmount,
+    rs.SettlementStatus,
+    rs.ApprovedAt,
+    rs.PaidAt
+FROM Franchise.RevenueShareSettlement rs
+JOIN Franchise.FranchisePartner f ON f.FranchiseID = rs.FranchiseID
+JOIN [Identity].UserAccount u ON u.UserID = f.ContactUserID
+JOIN Franchise.FranchiseContract fc ON fc.ContractID = rs.ContractID
+WHERE u.Username = USER_NAME();
+GO
+
 CREATE OR ALTER VIEW AppView.vw_ConnectorUtilization
 AS
 SELECT
@@ -381,6 +481,63 @@ BEGIN
            GrossRevenue, PartnerShareAmount, PlatformShareAmount, SettlementStatus
     FROM AppView.vw_ProfitSharing
     ORDER BY PeriodEnd DESC, GrossRevenue DESC;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE AppView.sp_GetMyFranchiseProfile
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT FranchiseID, FranchiseCode, FranchiseName, TaxCode, ContactPerson,
+           ContactPhone, ContactEmail, PartnerStatus, FullAddress
+    FROM AppView.vw_MyFranchiseProfile;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE AppView.sp_GetMyFranchiseContracts
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT ContractID, FranchiseCode, FranchiseName, ContractCode, StartDate,
+           EndDate, BaseRevenueShareRate, ContractStatus
+    FROM AppView.vw_MyFranchiseContracts
+    ORDER BY StartDate DESC, ContractCode;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE AppView.sp_GetMyFranchiseStations
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT StationID, StationCode, StationName, MaxPowerKW, StationStatus,
+           ContractCode, FullAddress
+    FROM AppView.vw_MyFranchiseStations
+    ORDER BY StationCode;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE AppView.sp_GetMyRevenueSharePolicies
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT RevenueSharePolicyID, FranchiseCode, FranchiseName, ContractCode,
+           PolicyCode, PartnerShareRate, PlatformShareRate, AppliedFrom,
+           AppliedTo, IsActive
+    FROM AppView.vw_MyRevenueSharePolicies
+    ORDER BY IsActive DESC, AppliedFrom DESC, PolicyCode;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE AppView.sp_GetMyRevenueShareSettlements
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT SettlementID, SettlementCode, FranchiseCode, FranchiseName,
+           ContractCode, PeriodStart, PeriodEnd, GrossRevenue,
+           PartnerShareAmount, PlatformShareAmount, SettlementStatus,
+           ApprovedAt, PaidAt
+    FROM AppView.vw_MyRevenueShareSettlements
+    ORDER BY PeriodEnd DESC, SettlementCode;
 END;
 GO
 

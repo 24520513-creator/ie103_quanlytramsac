@@ -45,6 +45,15 @@ BEGIN
 END;
 GO
 
+IF SUSER_ID(N'ev_franchise01_login') IS NULL
+BEGIN
+    CREATE LOGIN ev_franchise01_login
+    WITH PASSWORD = 'password',
+         CHECK_POLICY = ON,
+         CHECK_EXPIRATION = OFF;
+END;
+GO
+
 USE EV_Charging_System;
 GO
 
@@ -59,6 +68,7 @@ VALUES
     (N'admin01', N'ev_admin01_login'),
     (N'operator01', N'ev_operator01_login'),
     (N'business01', N'ev_business01_login'),
+    (N'franchise01', N'ev_franchise01_login'),
     (N'customer01', N'ev_customer01_login');
 
 DECLARE @DatabaseUser SYSNAME;
@@ -153,11 +163,20 @@ IF NOT EXISTS (
       AND member_principal_id = USER_ID(N'customer01')
 )
     ALTER ROLE db_ev_customer ADD MEMBER customer01;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.database_role_members
+    WHERE role_principal_id = USER_ID(N'db_ev_franchise_partner')
+      AND member_principal_id = USER_ID(N'franchise01')
+)
+    ALTER ROLE db_ev_franchise_partner ADD MEMBER franchise01;
 GO
 
 GRANT CONNECT TO admin01;
 GRANT CONNECT TO operator01;
 GRANT CONNECT TO business01;
+GRANT CONNECT TO franchise01;
 GRANT CONNECT TO customer01;
 GO
 
@@ -168,7 +187,7 @@ SELECT
 FROM sys.database_principals dp
 JOIN sys.database_role_members rm ON rm.member_principal_id = dp.principal_id
 LEFT JOIN sys.server_principals sp ON sp.sid = dp.sid
-WHERE dp.name IN (N'admin01', N'operator01', N'business01', N'customer01')
+WHERE dp.name IN (N'admin01', N'operator01', N'business01', N'franchise01', N'customer01')
 ORDER BY dp.name;
 GO
 

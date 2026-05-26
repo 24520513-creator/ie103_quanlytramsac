@@ -35,6 +35,11 @@ Bang nay dung de tra nhanh tinh nang, role su dung, mo ta ngan va file SQL can m
 | BusinessManager | Xem tang truong khach hang | Dem khach hang moi theo thang. | `business_manager/09_view_customer_growth.sql` |
 | BusinessManager | Xem KPI van hanh he thong | Xem tram, cong, phien sac, loi, ticket va top customer. | `business_manager/10_view_system_kpi.sql` |
 | BusinessManager | Hoan tien co ban | Doi trang thai payment va invoice sang Refunded, khong tao bang refund rieng. | `business_manager/11_refund_payment.sql` |
+| FranchisePartner | Xem ho so franchise cua minh | Doi tac dang nhap va xem thong tin franchise duoc map qua ContactUserID. | `franchise_partner/01_view_my_profile.sql` |
+| FranchisePartner | Xem hop dong cua minh | Xem hop dong nhuuong quyen thuoc franchise cua user hien tai. | `franchise_partner/02_view_my_contracts.sql` |
+| FranchisePartner | Xem tram cua minh | Xem cac tram thuoc franchise cua user hien tai. | `franchise_partner/03_view_my_stations.sql` |
+| FranchisePartner | Xem revenue share policy cua minh | Xem ty le chia doanh thu cua hop dong franchise cua user hien tai. | `franchise_partner/04_view_my_revenue_share_policy.sql` |
+| FranchisePartner | Xem settlement cua minh | Xem settlement va phan chia doanh thu cua franchise cua user hien tai. | `franchise_partner/05_view_my_settlements.sql` |
 | SystemAdmin | Tao tai khoan | Tao user moi va gan role ban dau. | `system_admin/01_create_user.sql` |
 | SystemAdmin | Khoa va mo tai khoan | Thay doi AccountStatus de kiem soat truy cap. | `system_admin/02_lock_unlock_user.sql` |
 | SystemAdmin | Reset password | Cap nhat PasswordHash va ghi audit. | `system_admin/03_reset_password.sql` |
@@ -46,6 +51,7 @@ Bang nay dung de tra nhanh tinh nang, role su dung, mo ta ngan va file SQL can m
 | Security core | Kiem tra quyen OperationsStaff | Operator xem du lieu van hanh nhung khong doc truc tiep bang identity/payment. | `security/02_operations_permissions.sql` |
 | Security core | Kiem tra quyen BusinessManager | Business manager xem bao cao nhung khong doc/sua truc tiep bang goc nhay cam. | `security/03_business_permissions.sql` |
 | Security core | Kiem tra quyen SystemAdmin | Admin xem user-role va audit log. | `security/04_admin_permissions.sql` |
+| Security core | Kiem tra quyen FranchisePartner | Franchise partner chi xem du lieu cua minh qua AppView va bi chan bang goc/quyen quan ly. | `security/09_franchise_partner_permissions.sql` |
 | Advanced Security | Dynamic data masking | Email, phone va password hash bi che voi user khong co UNMASK. Chay `09_Advanced_Security.sql` truoc. | `security/05_masking_demo.sql` |
 | Advanced Security | Row-level security | Customer chi thay phien sac cua minh trong policy tam thoi. | `security/06_row_level_security_demo.sql` |
 | Advanced Security | Soft delete | Vo hieu hoa xe bang IsActive thay vi xoa vat ly. | `security/07_soft_delete_demo.sql` |
