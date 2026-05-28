@@ -71,3 +71,110 @@ GO
 
 PRINT N'06 - Triggers created.';
 GO
+
+
+CREATE OR ALTER TRIGGER Operations.trg_Booking_PreventOverlap
+ON Operations.Booking
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN Operations.Booking b
+          ON  b.PointID      =  i.PointID
+          AND b.BookingID   <>  i.BookingID
+          AND b.BookingStatus NOT IN ('Cancelled', 'Completed', 'Expired')
+        WHERE i.BookedFrom < b.BookedTo
+          AND b.BookedFrom < i.BookedTo
+    )
+    BEGIN
+        RAISERROR(
+            'Booking trung gio voi booking dang ton tai tren cung cong sac.',
+            16, 1
+        );
+        ROLLBACK TRANSACTION;
+    END
+END;
+GO
+
+CREATE OR ALTER TRIGGER Operations.trg_ChargingSession_SyncPointStatus
+ON Operations.ChargingSession
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF NOT UPDATE(SessionStatus)
+        RETURN;
+    UPDATE cp
+    SET cp.PointStatus = 'Charging'
+    FROM Infrastructure.ChargingPoint cp
+    JOIN inserted i ON i.PointID   = cp.PointID
+    JOIN deleted  d ON d.SessionID = i.SessionID
+    WHERE i.SessionStatus = 'Active'
+      AND d.SessionStatus <> 'Active';
+    UPDATE cp
+    SET cp.PointStatus = 'Available'
+    FROM Infrastructure.ChargingPoint cp
+    JOIN inserted i ON i.PointID   = cp.PointID
+    JOIN deleted  d ON d.SessionID = i.SessionID
+    WHERE i.SessionStatus IN ('Completed', 'Failed')
+      AND d.SessionStatus NOT IN ('Completed', 'Failed');
+END;
+GO
+
+CREATE OR ALTER TRIGGER Maintenance.trg_Ticket_UpdatePointHealth
+ON Maintenance.MaintenanceTicket
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE cp
+    SET cp.HealthStatus = CASE
+        WHEN i.Priority = 'Critical' THEN 'Critical'
+        WHEN i.Priority = 'High'     THEN 'Warning'
+        ELSE cp.HealthStatus
+    END
+    FROM Infrastructure.ChargingPoint cp
+    JOIN inserted i ON i.PointID = cp.PointID
+    WHERE i.TicketStatus <> 'Closed'
+      AND i.Priority IN ('Critical', 'High');
+
+    UPDATE cp
+    SET cp.HealthStatus = 'Normal'
+    FROM Infrastructure.ChargingPoint cp
+    JOIN inserted i ON i.PointID = cp.PointID
+    WHERE i.TicketStatus = 'Closed'
+      AND NOT EXISTS (
+          SELECT 1
+          FROM Maintenance.MaintenanceTicket t
+          WHERE t.PointID      =  cp.PointID
+            AND t.TicketID    <>  i.TicketID
+            AND t.TicketStatus <> 'Closed'
+      );
+END;
+GO
+
+CREATE OR ALTER TRIGGER Payments.trg_PaymentTransaction_UpdateInvoice
+ON Payments.PaymentTransaction
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    IF NOT UPDATE(TransactionStatus)
+        RETURN;
+
+    UPDATE inv
+    SET inv.InvoiceStatus = 'Paid'
+    FROM Payments.Invoice inv
+    JOIN inserted i ON i.TransactionID = inv.TransactionID
+    JOIN deleted  d ON d.TransactionID = i.TransactionID
+    WHERE i.TransactionStatus = 'Completed'
+      AND d.TransactionStatus <> 'Completed';
+END;
+GO
