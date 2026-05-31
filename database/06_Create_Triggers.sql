@@ -79,7 +79,7 @@ AFTER INSERT, UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-
+ 
     IF EXISTS (
         SELECT 1
         FROM inserted i
@@ -89,6 +89,7 @@ BEGIN
           AND b.BookingStatus NOT IN ('Cancelled', 'Completed', 'Expired')
         WHERE i.BookedFrom < b.BookedTo
           AND b.BookedFrom < i.BookedTo
+          AND i.BookingStatus NOT IN ('Cancelled', 'Completed', 'Expired')
     )
     BEGIN
         RAISERROR(
@@ -106,9 +107,10 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-
+ 
     IF NOT UPDATE(SessionStatus)
         RETURN;
+ 
     UPDATE cp
     SET cp.PointStatus = 'Charging'
     FROM Infrastructure.ChargingPoint cp
@@ -116,13 +118,14 @@ BEGIN
     JOIN deleted  d ON d.SessionID = i.SessionID
     WHERE i.SessionStatus = 'Active'
       AND d.SessionStatus <> 'Active';
+ 
     UPDATE cp
     SET cp.PointStatus = 'Available'
     FROM Infrastructure.ChargingPoint cp
     JOIN inserted i ON i.PointID   = cp.PointID
     JOIN deleted  d ON d.SessionID = i.SessionID
-    WHERE i.SessionStatus IN ('Completed', 'Failed')
-      AND d.SessionStatus NOT IN ('Completed', 'Failed');
+    WHERE i.SessionStatus IN ('Completed', 'Failed', 'Cancelled')
+      AND d.SessionStatus NOT IN ('Completed', 'Failed', 'Cancelled');
 END;
 GO
 
@@ -132,7 +135,7 @@ AFTER INSERT, UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-
+ 
     UPDATE cp
     SET cp.HealthStatus = CASE
         WHEN i.Priority = 'Critical' THEN 'Critical'
@@ -143,19 +146,28 @@ BEGIN
     JOIN inserted i ON i.PointID = cp.PointID
     WHERE i.TicketStatus <> 'Closed'
       AND i.Priority IN ('Critical', 'High');
-
+ 
     UPDATE cp
-    SET cp.HealthStatus = 'Normal'
+    SET cp.HealthStatus = CASE
+        WHEN EXISTS (
+            SELECT 1 FROM Maintenance.MaintenanceTicket t
+            WHERE t.PointID      =  cp.PointID
+              AND t.TicketID    <>  i.TicketID
+              AND t.TicketStatus <> 'Closed'
+              AND t.Priority     =  'Critical'
+        ) THEN 'Critical'
+        WHEN EXISTS (
+            SELECT 1 FROM Maintenance.MaintenanceTicket t
+            WHERE t.PointID      =  cp.PointID
+              AND t.TicketID    <>  i.TicketID
+              AND t.TicketStatus <> 'Closed'
+              AND t.Priority     =  'High'
+        ) THEN 'Warning'
+        ELSE 'Normal'
+    END
     FROM Infrastructure.ChargingPoint cp
     JOIN inserted i ON i.PointID = cp.PointID
-    WHERE i.TicketStatus = 'Closed'
-      AND NOT EXISTS (
-          SELECT 1
-          FROM Maintenance.MaintenanceTicket t
-          WHERE t.PointID      =  cp.PointID
-            AND t.TicketID    <>  i.TicketID
-            AND t.TicketStatus <> 'Closed'
-      );
+    WHERE i.TicketStatus = 'Closed';
 END;
 GO
 
@@ -165,7 +177,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    
+ 
     IF NOT UPDATE(TransactionStatus)
         RETURN;
 
@@ -176,5 +188,13 @@ BEGIN
     JOIN deleted  d ON d.TransactionID = i.TransactionID
     WHERE i.TransactionStatus = 'Completed'
       AND d.TransactionStatus <> 'Completed';
+ 
+    UPDATE inv
+    SET inv.InvoiceStatus = 'Refunded'
+    FROM Payments.Invoice inv
+    JOIN inserted i ON i.TransactionID = inv.TransactionID
+    JOIN deleted  d ON d.TransactionID = i.TransactionID
+    WHERE i.TransactionStatus = 'Refunded'
+      AND d.TransactionStatus <> 'Refunded';
 END;
 GO
