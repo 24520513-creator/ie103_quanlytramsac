@@ -1,6 +1,6 @@
 # 1. System Overview
 
-Tai lieu nay phan tich source code database cua do an `EV_Charging_System` theo huong mon hoc He Quan Tri Co So Du Lieu. Trong source hien tai, backend va frontend khong con duoc giu lai; pham vi ky thuat tap trung vao SQL Server database, stored procedure, view, trigger, RBAC, seed data va cac script demo trong thu muc `database`.
+Tai lieu nay phan tich source code database cua do an `EV_Charging_System` theo huong mon hoc He Quan Tri Co So Du Lieu. Pham vi ky thuat cua tai lieu tap trung vao SQL Server database, stored procedure, view, trigger, RBAC, seed data va cac script demo trong thu muc `database`. Repo cung co backend (Node/Express API + xac thuc) va frontend (React/Vite) goi cac view/stored procedure nay, nhung khong thuoc pham vi phan tich cua tai lieu.
 
 ### Project Name
 
@@ -52,7 +52,7 @@ He thong mo phong bai toan quan ly thong tin cho mang tram sac xe dien:
 
 ### System Scope
 
-Source hien tai la mot database-centric system. Khong co API route, UI route, authentication service hay frontend dashboard trong repository. Cac luong nghiep vu duoc the hien bang stored procedure va demo scripts trong `database/features`.
+Day la mot he thong database-centric: toan bo nghiep vu, phan quyen va bao cao deu nam o tang SQL Server. Cac luong nghiep vu duoc the hien bang stored procedure va demo scripts trong `database/features`, va duoc backend/frontend goi lai qua catalog action (xem `README.md`).
 
 # 2. Business Workflow
 
