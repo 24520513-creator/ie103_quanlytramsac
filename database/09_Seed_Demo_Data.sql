@@ -5,11 +5,13 @@ GO
 HUONG DAN SU DUNG (seed v2 - realistic Vietnam)
 - Muc dich: mo phong he thong da hoat dong ~2 nam, phan bo theo thuc te Viet Nam.
 - Chay sau cac script 00 -> 08 (tren DB moi). Sau do chay 10 -> 13 nhu binh thuong.
+- Neu chay bang sqlcmd, dung them -f 65001 de doc dung UTF-8/tieng Viet.
 - Quy mo (uoc luong):
   + ~40 tinh/thanh (TP lon nhieu tram, tinh nho 1-2, mien nui 0-1).
-  + ~155 tram sac, ~850 cong sac, 15 franchise, ~28 operations, 500 customer.
+  + 100 tram sac, ~280 cong sac, 15 franchise, ~28 operations, 500 customer.
   + ~300k charging session trong 2 nam gan nhat, tap trung gio cao diem,
-    mat do tang dan theo thoi gian; co moc tang gia 2025 (phuc vu bao cao YoY).
+    moi customer ~25 phien/thang, toi da 2 phien/ngay va <40 phien/thang;
+    khong overlap tren cung cong sac; co moc tang gia 2025 (phuc vu bao cao YoY).
   + Booking, payment, invoice, telemetry, error, ticket, settlement theo ty le.
 - Toi uu: tat trigger nghiep vu trong luc bulk-load roi bat lai (nhanh + tu set status).
 - Tham so dieu chinh: @SessionCount, @TelemetryRows.
@@ -20,6 +22,7 @@ SET NOCOUNT ON;
 DECLARE @Hash       NVARCHAR(256) = N'$2a$12$DemoHashForIE103DatabaseOnly';  -- 13_Auth_Migration se dat hash that cho tai khoan demo
 DECLARE @EndDate    DATETIME2 = SYSDATETIME();
 DECLARE @StartDate  DATETIME2 = DATEADD(YEAR, -2, @EndDate);
+DECLARE @StartDay   DATETIME2 = CAST(CAST(@StartDate AS DATE) AS DATETIME2);
 DECLARE @Y2         DATETIME2 = DATEADD(YEAR, -1, @EndDate);   -- moc doi gia 2025
 DECLARE @Days       INT = DATEDIFF(DAY, @StartDate, @EndDate);
 DECLARE @SessionCount  INT = 300000;
@@ -41,53 +44,54 @@ DISABLE TRIGGER ALL ON Payments.PaymentTransaction;
 DISABLE TRIGGER ALL ON Maintenance.MaintenanceTicket;
 
 /* ============================================================
-   1) REGION (~40 tinh, co trong so StationCount; tong 25 tram, nhieu cong/tram)
+   1) REGION (~40 tinh, co trong so StationCount; tong 100 tram tren 40 tinh/thanh)
    ============================================================ */
 DECLARE @Prov TABLE (RegionCode NVARCHAR(20), RegionName NVARCHAR(100), Tier INT, StationCount INT);
 INSERT INTO @Prov (RegionCode, RegionName, Tier, StationCount) VALUES
 -- Tier 1: sieu do thi
-(N'HCM',  N'TP Ho Chi Minh', 1,  5),
-(N'HN',   N'Ha Noi',         1,  4),
-(N'DNG',  N'Da Nang',        1,  2),
-(N'BD',   N'Binh Duong',     1,  1),
-(N'HP',   N'Hai Phong',      1,  1),
-(N'DN',   N'Dong Nai',       1,  1),
-(N'CT',   N'Can Tho',        1,  1),
+(N'HCM',  N'TP Ho Chi Minh', 1,  8),
+(N'HN',   N'Ha Noi',         1,  7),
+(N'DNG',  N'Da Nang',        1,  5),
+(N'BD',   N'Binh Duong',     1,  4),
+(N'HP',   N'Hai Phong',      1,  4),
+(N'DN',   N'Dong Nai',       1,  4),
+(N'CT',   N'Can Tho',        1,  4),
 -- Tier 2: tinh/thanh lon
-(N'BRVT', N'Ba Ria - Vung Tau', 2, 1),
-(N'KH',   N'Khanh Hoa',      2, 1),
-(N'QNI',  N'Quang Ninh',     2, 1),
-(N'LD',   N'Lam Dong',       2, 1),
-(N'NA',   N'Nghe An',        2, 1),
-(N'TH',   N'Thanh Hoa',      2, 1),
-(N'TTH',  N'Thua Thien Hue', 2, 1),
-(N'BN',   N'Bac Ninh',       2, 1),
-(N'HD',   N'Hai Duong',      2, 1),
-(N'LA',   N'Long An',        2, 1),
-(N'TG',   N'Tien Giang',     2, 0),
-(N'VP',   N'Vinh Phuc',      2, 0),
-(N'AG',   N'An Giang',       2, 0),
-(N'KG',   N'Kien Giang',     2, 0),
+(N'BRVT', N'Ba Ria - Vung Tau', 2, 3),
+(N'KH',   N'Khanh Hoa',      2, 3),
+(N'QNI',  N'Quang Ninh',     2, 3),
+(N'LD',   N'Lam Dong',       2, 3),
+(N'NA',   N'Nghe An',        2, 3),
+(N'TH',   N'Thanh Hoa',      2, 3),
+(N'TTH',  N'Thua Thien Hue', 2, 3),
+(N'BN',   N'Bac Ninh',       2, 3),
+(N'HD',   N'Hai Duong',      2, 3),
+(N'LA',   N'Long An',        2, 3),
+(N'TG',   N'Tien Giang',     2, 3),
+(N'VP',   N'Vinh Phuc',      2, 3),
+(N'AG',   N'An Giang',       2, 3),
+(N'KG',   N'Kien Giang',     2, 3),
 -- Tier 3: tinh nho
-(N'QNM',  N'Quang Nam',      3, 0),
-(N'BTH',  N'Binh Thuan',     3, 0),
-(N'GL',   N'Gia Lai',        3, 0),
-(N'DLK',  N'Dak Lak',        3, 0),
-(N'TN',   N'Tay Ninh',       3, 0),
-(N'HNM',  N'Ha Nam',         3, 0),
-(N'NB',   N'Ninh Binh',      3, 0),
-(N'TB',   N'Thai Binh',      3, 0),
-(N'PT',   N'Phu Tho',        3, 0),
-(N'BG',   N'Bac Giang',      3, 0),
+(N'QNM',  N'Quang Nam',      3, 2),
+(N'QT',   N'Quang Tri',      3, 1),
+(N'BTH',  N'Binh Thuan',     3, 2),
+(N'GL',   N'Gia Lai',        3, 2),
+(N'DLK',  N'Dak Lak',        3, 1),
+(N'TN',   N'Tay Ninh',       3, 1),
+(N'HNM',  N'Ha Nam',         3, 1),
+(N'NB',   N'Ninh Binh',      3, 1),
+(N'TB',   N'Thai Binh',      3, 1),
+(N'PT',   N'Phu Tho',        3, 1),
+(N'BG',   N'Bac Giang',      3, 1),
 -- Tier 4: mien nui (0-1 tram)
-(N'LCI',  N'Lao Cai',        4, 0),
-(N'HG',   N'Ha Giang',       4, 0),
-(N'SL',   N'Son La',         4, 0),
-(N'DB',   N'Dien Bien',      4, 0),
-(N'LCH',  N'Lai Chau',       4, 0),
-(N'CB',   N'Cao Bang',       4, 0),
-(N'BK',   N'Bac Kan',        4, 0),
-(N'KT',   N'Kon Tum',        4, 0);
+(N'LCI',  N'Lao Cai',        4, 1),
+(N'HG',   N'Ha Giang',       4, 1),
+(N'SL',   N'Son La',         4, 1),
+(N'DB',   N'Dien Bien',      4, 1),
+(N'LCH',  N'Lai Chau',       4, 1),
+(N'CB',   N'Cao Bang',       4, 1),
+(N'BK',   N'Bac Kan',        4, 1),
+(N'KT',   N'Kon Tum',        4, 1);
 
 INSERT INTO Core.Region (RegionCode, RegionName)
 SELECT RegionCode, RegionName FROM @Prov;
@@ -160,9 +164,19 @@ SELECT CASE WHEN N.n <= 99 THEN N'customer' + RIGHT(N'00' + CAST(N.n AS NVARCHAR
        @Hash,
        vn.FullName + N' ' + RIGHT(N'000' + CAST(N.n AS NVARCHAR(10)), 3),
        CASE WHEN N.n % 71 = 0 THEN N'Suspended' WHEN N.n % 97 = 0 THEN N'Locked' WHEN N.n % 53 = 0 THEN N'Pending' ELSE N'Active' END,
-       DATEADD(DAY, CAST(@Days * SQRT((ABS(CHECKSUM(N.n)) % 100000) / 100000.0) AS INT), @StartDate)
+       DATEADD(DAY, -180 + (N.n % 180), @StartDay)
 FROM N
 JOIN @VietnameseNames vn ON vn.n = ((N.n - 1) % 60) + 1;
+
+;WITH Customers AS (
+    SELECT UserID, ROW_NUMBER() OVER (ORDER BY UserID) AS rn
+    FROM [Identity].UserAccount
+    WHERE Username LIKE N'customer%'
+)
+UPDATE u
+SET CreatedAt = DATEADD(DAY, -180 + (c.rn % 180), @StartDay)
+FROM [Identity].UserAccount u
+JOIN Customers c ON c.UserID = u.UserID;
 
 INSERT INTO [Identity].UserRole (UserID, RoleID)
 SELECT u.UserID, r.RoleID
@@ -280,12 +294,14 @@ INSERT INTO @StationRoad (RegionCode, RoadName, Ward, District, Latitude, Longit
 (N'DN',N'Vo Thi Sau',N'Thong Nhat',N'Bien Hoa',10.9482000,106.8243000),(N'DN',N'Pham Van Thuan',N'Tan Mai',N'Bien Hoa',10.9554000,106.8438000),
 (N'CT',N'Hoa Binh',N'Ninh Kieu',N'Ninh Kieu',10.0342000,105.7842000),(N'CT',N'Nguyen Van Cu',N'An Khanh',N'Ninh Kieu',10.0291000,105.7574000),
 (N'BRVT',N'Ba Cu',N'Phuong 1',N'TP Vung Tau',10.3497000,107.0763000),(N'KH',N'Tran Phu',N'Loc Tho',N'Nha Trang',12.2388000,109.1967000),(N'QNI',N'Ha Long',N'Bai Chay',N'Ha Long',20.9531000,107.0507000),(N'LD',N'Tran Hung Dao',N'Phuong 10',N'Da Lat',11.9404000,108.4583000),
-(N'NA',N'Le Duan',N'Truong Thi',N'TP Vinh',18.6697000,105.6813000),(N'TH',N'Dai lo Le Loi',N'Dien Bien',N'TP Thanh Hoa',19.8067000,105.7764000),(N'TTH',N'Hung Vuong',N'Phu Hoi',N'TP Hue',16.4637000,107.5909000),
+(N'NA',N'Le Duan',N'Truong Thi',N'TP Vinh',18.6697000,105.6813000),(N'TH',N'Dai lo Le Loi',N'Dien Bien',N'TP Thanh Hoa',19.8067000,105.7764000),(N'TTH',N'Hung Vuong',N'Phu Hoi',N'TP Hue',16.4637000,107.5909000),(N'QT',N'Hung Vuong',N'Phuong 1',N'Dong Ha',16.8163000,107.1003000),
 (N'BN',N'Ly Thai To',N'Vo Cuong',N'TP Bac Ninh',21.1849000,106.0763000),(N'HD',N'Nguyen Luong Bang',N'Thanh Binh',N'TP Hai Duong',20.9409000,106.3330000),(N'LA',N'Hung Vuong',N'Phuong 2',N'Tan An',10.5354000,106.4137000),(N'TG',N'Ap Bac',N'Phuong 5',N'My Tho',10.3684000,106.3561000),(N'VP',N'Me Linh',N'Khai Quang',N'Vinh Yen',21.3089000,105.6049000),
 (N'AG',N'Tran Hung Dao',N'My Binh',N'Long Xuyen',10.3865000,105.4352000),(N'KG',N'Nguyen Trung Truc',N'Vinh Lac',N'Rach Gia',10.0136000,105.0809000),(N'QNM',N'Phan Chau Trinh',N'Minh An',N'Hoi An',15.8772000,108.3269000),(N'BTH',N'Ton Duc Thang',N'Phu Thuy',N'Phan Thiet',10.9338000,108.1022000),
 (N'GL',N'Hung Vuong',N'Tay Son',N'Pleiku',13.9718000,108.0151000),(N'DLK',N'Nguyen Tat Thanh',N'Tan Loi',N'Buon Ma Thuot',12.6823000,108.0442000),(N'TN',N'30 Thang 4',N'Phuong 3',N'TP Tay Ninh',11.3100000,106.0983000),(N'HNM',N'Bien Hoa',N'Minh Khai',N'Phu Ly',20.5411000,105.9139000),
 (N'NB',N'Tran Hung Dao',N'Dong Thanh',N'Ninh Binh',20.2537000,105.9745000),(N'TB',N'Ly Bon',N'De Tham',N'Thai Binh',20.4463000,106.3366000),(N'PT',N'Hung Vuong',N'Gia Cam',N'Viet Tri',21.3017000,105.4308000),(N'BG',N'Hoang Van Thu',N'Tran Phu',N'Bac Giang',21.2731000,106.1946000),
-(N'LCI',N'Hoang Lien',N'Coc Leu',N'Lao Cai',22.4856000,103.9707000),(N'HG',N'Nguyen Trai',N'Minh Khai',N'Ha Giang',22.8233000,104.9836000),(N'SL',N'To Hieu',N'Chieng Le',N'Son La',21.3270000,103.9141000);
+(N'LCI',N'Hoang Lien',N'Coc Leu',N'Lao Cai',22.4856000,103.9707000),(N'HG',N'Nguyen Trai',N'Minh Khai',N'Ha Giang',22.8233000,104.9836000),(N'SL',N'To Hieu',N'Chieng Le',N'Son La',21.3270000,103.9141000),
+(N'DB',N'Vo Nguyen Giap',N'Muong Thanh',N'Dien Bien Phu',21.3866000,103.0160000),(N'LCH',N'Tran Phu',N'Tan Phong',N'Lai Chau',22.3964000,103.4582000),(N'CB',N'Kim Dong',N'Hop Giang',N'Cao Bang',22.6666000,106.2639000),
+(N'BK',N'Truong Chinh',N'Duc Xuan',N'Bac Kan',22.1470000,105.8348000),(N'KT',N'Phan Dinh Phung',N'Quyet Thang',N'Kon Tum',14.3497000,108.0005000);
 
 ;WITH Tally AS (SELECT TOP (30) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS k FROM sys.all_objects),
 Expanded AS (
@@ -306,14 +322,13 @@ SELECT e.seq, e.RegionID, e.RegionCode, e.RegionName, e.Tier, e.k,
                  WHEN 2 THEN (CASE seq % 2 WHEN 0 THEN 150 ELSE 120 END)
                  WHEN 3 THEN 120 ELSE 60 END AS MaxPowerKW,
        -- So cong theo tier
-       CASE e.Tier WHEN 1 THEN 24 + (seq % 9)    -- 24..32
-                 WHEN 2 THEN 12 + (seq % 7)    -- 12..18
-                 WHEN 3 THEN 8 + (seq % 5)     -- 8..12
-                 ELSE 6 + (seq % 3) END AS PointCount, -- 6..8
+       CASE WHEN e.Tier = 1 AND seq % 3 = 0 THEN 5
+            WHEN seq % 2 = 0 THEN 3
+            ELSE 2 END AS PointCount,
        CASE WHEN seq % 29 = 0 THEN N'UnderMaintenance'
             WHEN seq % 53 = 0 THEN N'Inactive'
             ELSE N'Active' END AS StationStatus,
-       DATEADD(DAY, (seq * 4) % @Days, @StartDate) AS OpenedAt
+       DATEADD(DAY, -30 - (seq % 180), @StartDay) AS OpenedAt
 INTO #StationPlan
 FROM Expanded e
 CROSS APPLY (
@@ -362,7 +377,7 @@ UNION ALL SELECT StationID, @GBT FROM Infrastructure.ChargingStation WHERE Stati
 /* ============================================================
    6) CHARGING POINTS — expand theo PointCount tung tram
    ============================================================ */
-;WITH Tally AS (SELECT TOP (32) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS k FROM sys.all_objects)
+;WITH Tally AS (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS k FROM sys.all_objects)
 INSERT INTO Infrastructure.ChargingPoint (PointCode, StationID, ConnectorTypeID, PowerKW, SerialNumber, PointStatus, HealthStatus)
 SELECT s.StationCode + N'-P' + RIGHT(N'00' + CAST(t.k AS NVARCHAR(10)), 2),
        s.StationID,
@@ -404,8 +419,8 @@ DECLARE @FST25 INT = (SELECT PolicyID FROM Operations.PricingPolicy WHERE Policy
 /* ============================================================
    8) VEHICLES (~1.3 / customer)
    ============================================================ */
-;WITH Customers AS (SELECT ROW_NUMBER() OVER (ORDER BY UserID) AS rn, UserID FROM [Identity].UserAccount WHERE Username LIKE N'customer%')
-INSERT INTO Operations.Vehicle (UserID, PlateNumber, Brand, Model, BatteryCapacityKWh, PreferredConnectorTypeID)
+;WITH Customers AS (SELECT ROW_NUMBER() OVER (ORDER BY UserID) AS rn, UserID, CreatedAt FROM [Identity].UserAccount WHERE Username LIKE N'customer%')
+INSERT INTO Operations.Vehicle (UserID, PlateNumber, Brand, Model, BatteryCapacityKWh, PreferredConnectorTypeID, CreatedAt)
 SELECT UserID,
        CASE rn % 10 WHEN 0 THEN N'51E-' WHEN 1 THEN N'30E-' WHEN 2 THEN N'43E-' WHEN 3 THEN N'61E-' WHEN 4 THEN N'15E-'
                     WHEN 5 THEN N'60E-' WHEN 6 THEN N'65E-' WHEN 7 THEN N'72E-' WHEN 8 THEN N'79E-' ELSE N'29E-' END
@@ -416,17 +431,19 @@ SELECT UserID,
                     WHEN 5 THEN N'EV6' WHEN 6 THEN N'Atto 3' WHEN 7 THEN N'MG4 Electric' WHEN 8 THEN N'Taycan' ELSE N'XC40 Recharge' END,
        CASE rn % 10 WHEN 0 THEN 42.00 WHEN 1 THEN 82.00 WHEN 2 THEN 92.00 WHEN 3 THEN 75.00 WHEN 4 THEN 72.60
                     WHEN 5 THEN 77.40 WHEN 6 THEN 60.50 WHEN 7 THEN 64.00 WHEN 8 THEN 93.40 ELSE 78.00 END,
-       CASE WHEN rn % 9 IN (0,1) THEN @T2 ELSE @CCS2 END
+       CASE WHEN rn % 9 IN (0,1) THEN @T2 ELSE @CCS2 END,
+       DATEADD(HOUR, 1, CreatedAt)
 FROM Customers;
 
-;WITH Customers AS (SELECT ROW_NUMBER() OVER (ORDER BY UserID) AS rn, UserID FROM [Identity].UserAccount WHERE Username LIKE N'customer%')
-INSERT INTO Operations.Vehicle (UserID, PlateNumber, Brand, Model, BatteryCapacityKWh, PreferredConnectorTypeID)
+;WITH Customers AS (SELECT ROW_NUMBER() OVER (ORDER BY UserID) AS rn, UserID, CreatedAt FROM [Identity].UserAccount WHERE Username LIKE N'customer%')
+INSERT INTO Operations.Vehicle (UserID, PlateNumber, Brand, Model, BatteryCapacityKWh, PreferredConnectorTypeID, CreatedAt)
 SELECT UserID,
        CASE rn % 6 WHEN 0 THEN N'51E-' WHEN 1 THEN N'30E-' WHEN 2 THEN N'43E-' WHEN 3 THEN N'61E-' WHEN 4 THEN N'65E-' ELSE N'79E-' END
        + RIGHT(N'00000' + CAST(60000 + rn AS NVARCHAR(10)), 5),
        CASE WHEN rn % 2 = 0 THEN N'VinFast' ELSE N'Tesla' END,
        CASE WHEN rn % 2 = 0 THEN N'VF e34' ELSE N'Model Y' END,
-       CASE WHEN rn % 2 = 0 THEN 42.00 ELSE 78.00 END, @CCS2
+       CASE WHEN rn % 2 = 0 THEN 42.00 ELSE 78.00 END, @CCS2,
+       DATEADD(DAY, 30 + (rn % 45), CreatedAt)
 FROM Customers WHERE rn % 3 = 0;
 
 /* ============================================================
@@ -442,6 +459,7 @@ FROM sys.all_objects a CROSS JOIN sys.all_objects b;
 
 SELECT ROW_NUMBER() OVER (ORDER BY u.UserID) AS CustomerRow, u.UserID,
        (SELECT TOP 1 v.VehicleID FROM Operations.Vehicle v WHERE v.UserID = u.UserID ORDER BY v.VehicleID) AS VehicleID,
+       DATEDIFF(DAY, @StartDay, CAST(CAST(u.CreatedAt AS DATE) AS DATETIME2)) AS CreatedDayIdx,
        home.RegionID AS HomeRegionID,
        CASE WHEN ROW_NUMBER() OVER (ORDER BY u.UserID) <= 100 THEN N'FrequentCommuter'
             WHEN ROW_NUMBER() OVER (ORDER BY u.UserID) <= 350 THEN N'UrbanCasual'
@@ -469,30 +487,25 @@ INTO #RegionPointCount
 FROM #Points
 GROUP BY RegionID;
 
-;WITH Base AS (
+;WITH CustomerSchedule AS (
+    SELECT n.Seq,
+           (((n.Seq - 1) % @CustTotal) + 1) AS CustomerRow,
+           ((n.Seq - 1) / @CustTotal) AS CustomerSessionIndex
+    FROM #Nums n
+),
+Candidate AS (
     SELECT n.Seq,
            c.UserID, c.VehicleID,
-           pt.PointID, pt.StationID,
-           -- ngay: nghieng ve gan day (SQRT skew)
-           CAST((@Days - 1) * SQRT((ABS(CHECKSUM(n.Seq, 7)) % 100000) / 100000.0) AS INT) AS DayIdx,
-           -- gio: dồn cao diem sang (7-9) & toi (17-20)
-           CASE c.DriverSegment
-                WHEN N'FrequentCommuter' THEN
-                    CASE (ABS(CHECKSUM(n.Seq, 13)) % 20)
-                         WHEN 0 THEN 7 WHEN 1 THEN 7 WHEN 2 THEN 8 WHEN 3 THEN 8 WHEN 4 THEN 9
-                         WHEN 5 THEN 17 WHEN 6 THEN 18 WHEN 7 THEN 18 WHEN 8 THEN 19 WHEN 9 THEN 20
-                         WHEN 10 THEN 12 WHEN 11 THEN 13 ELSE 21 END
-                WHEN N'UrbanCasual' THEN
-                    CASE (ABS(CHECKSUM(n.Seq, 13)) % 20)
-                         WHEN 0 THEN 10 WHEN 1 THEN 11 WHEN 2 THEN 12 WHEN 3 THEN 13 WHEN 4 THEN 14
-                         WHEN 5 THEN 17 WHEN 6 THEN 18 WHEN 7 THEN 19 WHEN 8 THEN 20 WHEN 9 THEN 21
-                         WHEN 10 THEN 8 ELSE 22 END
-                ELSE
-                    CASE (ABS(CHECKSUM(n.Seq, 13)) % 20)
-                         WHEN 0 THEN 6 WHEN 1 THEN 7 WHEN 2 THEN 9 WHEN 3 THEN 10 WHEN 4 THEN 11
-                         WHEN 5 THEN 15 WHEN 6 THEN 16 WHEN 7 THEN 18 WHEN 8 THEN 19 ELSE 22 END
+           (n.CustomerSessionIndex / 25) AS MonthIdx,
+           ((n.CustomerSessionIndex % 25) * 11) % 28 AS DayInMonth,
+           -- gio cao diem; moi customer co 25 phien/thang, khong vuot 40 phien/thang
+           CASE (ABS(CHECKSUM(n.Seq, 13)) % 10)
+                WHEN 0 THEN 7 WHEN 1 THEN 7 WHEN 2 THEN 7
+                WHEN 3 THEN 12 WHEN 4 THEN 12
+                WHEN 5 THEN 17 WHEN 6 THEN 17 WHEN 7 THEN 17
+                ELSE 22
            END AS Hr,
-           (n.Seq % 60) AS Minu,
+           (ABS(CHECKSUM(n.Seq, 23)) % 4) * 5 AS Minu,
            CASE c.DriverSegment
                 WHEN N'FrequentCommuter' THEN 25 + (ABS(CHECKSUM(n.Seq, 21)) % 46)
                 WHEN N'UrbanCasual' THEN 35 + (ABS(CHECKSUM(n.Seq, 21)) % 71)
@@ -503,12 +516,26 @@ GROUP BY RegionID;
                 ELSE 18.0 + ((ABS(CHECKSUM(n.Seq, 3)) % 80) * 0.55) END AS DECIMAL(14,4)) AS TotalKWh,
            CAST(100000 + (n.Seq * 8.5) AS DECIMAL(14,4)) AS MeterStart,
            (n.Seq % 11) AS PolicyBucket
-    FROM #Nums n
-    JOIN #Customers c ON c.CustomerRow = (((n.Seq - 1) + (((n.Seq - 1) / @CustTotal) * 37)) % @CustTotal) + 1
-    JOIN #Points pt ON pt.rn = (((n.Seq - 1) * 37) % @PointTotal) + 1
+    FROM CustomerSchedule n
+    JOIN #Customers c ON c.CustomerRow = n.CustomerRow
+),
+Scheduled AS (
+    SELECT *,
+           DATEADD(MINUTE, Minu, DATEADD(HOUR, Hr, DATEADD(DAY, DayInMonth, DATEADD(MONTH, MonthIdx, @StartDay)))) AS StartTime
+    FROM Candidate
+),
+Base AS (
+    SELECT s.Seq, s.UserID, s.VehicleID, pt.PointID, pt.StationID,
+           s.DurationMinutes, s.TotalKWh, s.MeterStart, s.StartTime, s.PolicyBucket
+    FROM (
+        SELECT *,
+               ROW_NUMBER() OVER (PARTITION BY CAST(StartTime AS DATE), Hr ORDER BY Seq) AS SlotSeq
+        FROM Scheduled
+    ) s
+    JOIN #Points pt ON pt.rn = ((s.SlotSeq - 1) % @PointTotal) + 1
 )
 SELECT Seq, UserID, VehicleID, PointID, StationID, DurationMinutes, TotalKWh, MeterStart,
-       DATEADD(MINUTE, Minu, DATEADD(HOUR, Hr, DATEADD(DAY, DayIdx, CAST(CAST(@StartDate AS DATE) AS DATETIME2)))) AS StartTime,
+       StartTime,
        PolicyBucket,
        CAST(NULL AS INT) AS PolicyID,
        CAST(NULL AS NVARCHAR(30)) AS SessionStatus,
@@ -545,7 +572,7 @@ SELECT N'BKG-' + RIGHT(N'00000000' + CAST(Seq AS NVARCHAR(10)), 8),
        UserID, VehicleID, StationID, PointID,
        DATEADD(MINUTE, -20, StartTime), DATEADD(MINUTE, DurationMinutes + 20, StartTime),
        CASE WHEN SessionStatus = N'Completed' THEN N'Completed' ELSE N'Expired' END,
-       DATEADD(DAY, -1, StartTime), DATEADD(MINUTE, DurationMinutes, StartTime)
+       DATEADD(HOUR, -2, StartTime), DATEADD(MINUTE, DurationMinutes, StartTime)
 FROM #SessionSeed
 WHERE ABS(CHECKSUM(Seq, PointID, UserID)) % 3 = 0
   AND SessionStatus <> N'Charging';
@@ -603,16 +630,13 @@ FROM #SessionSeed ss
 JOIN Operations.ChargingSession cs ON cs.SessionCode = N'SES-' + RIGHT(N'00000000' + CAST(ss.Seq AS NVARCHAR(10)), 8)
 JOIN Payments.PaymentTransaction pt ON pt.SessionID = cs.SessionID;
 
--- Bao dam tai khoan demo customer01 co lich su hoat dong de man hinh web khong bi trong.
+-- customer01 da co lich su sinh theo lich chung; khong reassign them phien de tranh vuot tran demo.
 DECLARE @DemoCustomerID INT = (SELECT UserID FROM [Identity].UserAccount WHERE Username = N'customer01');
 DECLARE @DemoVehicleID INT = (SELECT TOP 1 VehicleID FROM Operations.Vehicle WHERE UserID = @DemoCustomerID ORDER BY VehicleID);
 
-SELECT TOP (260) CAST(cs.SessionID AS BIGINT) AS SessionID, CAST(cs.BookingID AS BIGINT) AS BookingID
+SELECT CAST(NULL AS BIGINT) AS SessionID, CAST(NULL AS BIGINT) AS BookingID
 INTO #DemoCustomerSession
-FROM Operations.ChargingSession cs
-WHERE cs.UserID <> @DemoCustomerID
-  AND cs.SessionStatus = N'Completed'
-ORDER BY cs.StartTime DESC;
+WHERE 1 = 0;
 
 UPDATE cs
 SET UserID = @DemoCustomerID,
@@ -741,5 +765,5 @@ DROP TABLE #DemoCustomerSession;
 DROP TABLE #TelemetryNums;
 DROP TABLE #ErrorNums;
 
-PRINT N'09 - Realistic VN two-year seed created: 25 stations, high-density charging points, 500 customers, ~300k ended sessions, telemetry, maintenance, payments, invoices, settlements.';
+PRINT N'09 - Realistic VN two-year seed created: 100 stations across 40 regions, 2-3 points per station with selected 5-point hubs, 500 customers, ~300k ended sessions, telemetry, maintenance, payments, invoices, settlements.';
 GO

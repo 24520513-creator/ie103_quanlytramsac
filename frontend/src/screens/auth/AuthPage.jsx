@@ -3,6 +3,8 @@ import { API_URL } from '../../lib/api';
 import { demoUsers } from '../../config';
 import { passwordStrength, validateRegister } from '../../lib/auth';
 import { EyeIcon, EyeOffIcon } from '../../components/Icons';
+import { SqlTooltip } from '../../components/SqlTooltip';
+import { SQL_HINTS } from '../../lib/sqlHints';
 
 const REMEMBER_KEY = 'evcharge:rememberedIdentifier';
 
@@ -96,7 +98,7 @@ function LoginForm({ onLogin, onForgot }) {
         <label className="checkLabel"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />Ghi nhớ tài khoản trên thiết bị này</label>
         <button type="button" className="linkButton" onClick={onForgot}>Quên mật khẩu?</button>
       </div>
-      <button className="primaryButton" disabled={busy}>{busy ? 'Đang đăng nhập...' : 'Đăng nhập'}</button>
+      <SqlTooltip hint={SQL_HINTS.login}><button className="primaryButton" disabled={busy}>{busy ? 'Đang đăng nhập...' : 'Đăng nhập'}</button></SqlTooltip>
       {import.meta.env.DEV && (
         <div className="demoGrid">
           {demoUsers.map(([username, label]) => (
@@ -150,7 +152,7 @@ function RegisterForm({ onDone }) {
       <PasswordMeter score={strength.score} label={strength.label} />
       <label>Nhập lại mật khẩu *<input type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} /></label>
       <label className="checkLabel"><input type="checkbox" checked={form.acceptedTerms} onChange={(e) => setForm({ ...form, acceptedTerms: e.target.checked })} />Tôi đồng ý với điều khoản sử dụng dịch vụ.</label>
-      <button className="primaryButton" disabled={busy}>{busy ? 'Đang tạo tài khoản...' : 'Tạo tài khoản khách hàng'}</button>
+      <SqlTooltip hint={SQL_HINTS.register}><button className="primaryButton" disabled={busy}>{busy ? 'Đang tạo tài khoản...' : 'Tạo tài khoản khách hàng'}</button></SqlTooltip>
       {message && <p className={message.includes('thành công') ? 'success' : 'error'}>{message}</p>}
     </form>
   );
@@ -179,7 +181,7 @@ function ForgotPasswordForm({ onBack }) {
     <form onSubmit={submit} className="authForm">
       <p>Nhập email, số điện thoại hoặc tên đăng nhập. Hệ thống sẽ gửi hướng dẫn đặt lại mật khẩu nếu thông tin hợp lệ.</p>
       <label>Thông tin tài khoản<input value={identifier} onChange={(e) => setIdentifier(e.target.value)} /></label>
-      <button className="primaryButton" disabled={busy}>{busy ? 'Đang gửi...' : 'Gửi hướng dẫn'}</button>
+      <SqlTooltip hint={SQL_HINTS.forgotPassword}><button className="primaryButton" disabled={busy}>{busy ? 'Đang gửi...' : 'Gửi hướng dẫn'}</button></SqlTooltip>
       <button type="button" className="linkButton left" onClick={onBack}>Quay lại đăng nhập</button>
       {message && <p className="success">{message}</p>}
     </form>
@@ -216,7 +218,7 @@ function ResetPasswordForm({ token, onDone }) {
       <label>Mật khẩu mới<input type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
       <PasswordMeter score={strength.score} label={strength.label} />
       <label>Nhập lại mật khẩu mới<input type="password" autoComplete="new-password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} /></label>
-      <button className="primaryButton" disabled={busy}>{busy ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}</button>
+      <SqlTooltip hint={SQL_HINTS.resetPassword}><button className="primaryButton" disabled={busy}>{busy ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}</button></SqlTooltip>
       {message && <p className={message.includes('cập nhật') ? 'success' : 'error'}>{message}</p>}
     </form>
   );

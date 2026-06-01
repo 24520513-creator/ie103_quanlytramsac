@@ -6,6 +6,7 @@ import { Bars } from '../../components/charts';
 import {
   Card, CardHeader, PageHeader, Button, Badge, EmptyState, Loader, SearchInput, Tabs
 } from '../../components/ui';
+import { SQL_HINTS } from '../../lib/sqlHints';
 import {
   OperationsIcon, MaintenanceIcon, ActivityIcon, AlertTriangleIcon, PlusIcon, MapPinIcon, BoltIcon
 } from '../../components/Icons';
@@ -75,7 +76,7 @@ export function StationsScreen({ ctx, h }) {
   return (
     <div className="ui-stack">
       <PageHeader icon={<MapPinIcon size={22} />} title="Trạm & cổng sạc" subtitle="Theo dõi và điều chỉnh trạng thái vận hành."
-        actions={h.has('updatePointStatus') && <Button variant="ghost" onClick={() => setEditPoint(true)}>Cập nhật cổng</Button>} />
+        actions={h.has('updatePointStatus') && <Button variant="ghost" sqlHint={SQL_HINTS.updatePointStatus} onClick={() => setEditPoint(true)}>Cập nhật cổng</Button>} />
       <SearchInput value={search} onChange={setSearch} placeholder="Tìm trạm..." />
 
       {loading ? <Loader /> : filtered.length === 0 ? <EmptyState title="Không có trạm" /> : (
@@ -93,7 +94,7 @@ export function StationsScreen({ ctx, h }) {
                 <div className="metric bad"><b>{formatNumber(s.ProblemPoints)}</b><span>Sự cố</span></div>
               </div>
               {h.has('updateStationStatus') && (
-                <Button variant="ghost" className="ui-btn-sm" onClick={() => setEditStation(s)}>Đổi trạng thái trạm</Button>
+                <Button variant="ghost" className="ui-btn-sm" sqlHint={SQL_HINTS.updateStationStatus} onClick={() => setEditStation(s)}>Đổi trạng thái trạm</Button>
               )}
             </Card>
           ))}
@@ -135,7 +136,7 @@ export function ActiveSessionsScreen({ ctx, h }) {
                 <span><BoltIcon size={14} />{formatNumber(s.TotalKWh)} kWh</span>
               </div>
               <span className="muted-line">Bắt đầu {formatDate(s.StartTime)}</span>
-              {h.has('markSessionFailed') && <Button variant="danger" className="ui-btn-sm" icon={<AlertTriangleIcon size={14} />} onClick={() => setFail(s)}>Đánh dấu lỗi</Button>}
+              {h.has('markSessionFailed') && <Button variant="danger" className="ui-btn-sm" icon={<AlertTriangleIcon size={14} />} sqlHint={SQL_HINTS.markSessionFailed} onClick={() => setFail(s)}>Đánh dấu lỗi</Button>}
             </Card>
           ))}
         </div>
@@ -176,8 +177,8 @@ export function MaintenanceScreen({ ctx, h }) {
       <PageHeader icon={<MaintenanceIcon size={22} />} title="Bảo trì" subtitle="Quản lý ticket sự cố và bảo trì theo trạng thái."
         actions={(
           <>
-            {h.has('reportError') && <Button variant="ghost" icon={<AlertTriangleIcon size={16} />} onClick={() => setReport(true)}>Ghi nhận lỗi</Button>}
-            {h.has('scheduleMaintenance') && <Button icon={<PlusIcon size={16} />} onClick={() => setSchedule(true)}>Lập lịch bảo trì</Button>}
+            {h.has('reportError') && <Button variant="ghost" icon={<AlertTriangleIcon size={16} />} sqlHint={SQL_HINTS.reportError} onClick={() => setReport(true)}>Ghi nhận lỗi</Button>}
+            {h.has('scheduleMaintenance') && <Button icon={<PlusIcon size={16} />} sqlHint={SQL_HINTS.scheduleMaintenance} onClick={() => setSchedule(true)}>Lập lịch bảo trì</Button>}
           </>
         )} />
 
@@ -194,8 +195,8 @@ export function MaintenanceScreen({ ctx, h }) {
                     <span className="muted-line">{t.StationCode}{t.PointCode ? ` · ${t.PointCode}` : ''}</span>
                     {t.AssignedToFullName && <span className="muted-line">👤 {t.AssignedToFullName}</span>}
                     <div className="ticket-actions">
-                      {h.has('assignTicket') && !/closed/i.test(t.TicketStatus) && <Button variant="ghost" className="ui-btn-sm" onClick={() => setAssign(t)}>Phân công</Button>}
-                      {h.has('closeTicket') && !/closed/i.test(t.TicketStatus) && <Button variant="soft" className="ui-btn-sm" onClick={() => setClose(t)}>Đóng</Button>}
+                      {h.has('assignTicket') && !/closed/i.test(t.TicketStatus) && <Button variant="ghost" className="ui-btn-sm" sqlHint={SQL_HINTS.assignTicket} onClick={() => setAssign(t)}>Phân công</Button>}
+                      {h.has('closeTicket') && !/closed/i.test(t.TicketStatus) && <Button variant="soft" className="ui-btn-sm" sqlHint={SQL_HINTS.closeTicket} onClick={() => setClose(t)}>Đóng</Button>}
                     </div>
                   </Card>
                 ))}

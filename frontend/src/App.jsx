@@ -5,10 +5,11 @@ import { roleLabels } from './config';
 import { AuthPage } from './screens/auth/AuthPage';
 import { sectionsFor } from './screens/registry';
 import { Badge } from './components/ui';
-import { LogoutIcon, MenuIcon, CloseIcon, ChevronLeftIcon, ChevronRightIcon } from './components/Icons';
+import { LogoutIcon, MenuIcon, CloseIcon, ChevronLeftIcon, ChevronRightIcon, SunIcon, MoonIcon } from './components/Icons';
 
 const LAST_SECTION_KEY = 'evcharge:lastSection';
 const NAV_COLLAPSED_KEY = 'evcharge:navCollapsed';
+const THEME_KEY = 'evcharge:theme';
 
 function readHashId() {
   return window.location.hash.replace(/^#\/?/, '').trim();
@@ -32,6 +33,16 @@ export default function App() {
   const [navCollapsed, setNavCollapsed] = useState(() => {
     try { return localStorage.getItem(NAV_COLLAPSED_KEY) === '1'; } catch { return false; }
   });
+  const [isDark, setIsDark] = useState(() => {
+    try { return localStorage.getItem(THEME_KEY) === 'dark'; } catch { return false; }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    try { localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light'); } catch { /* ignore */ }
+  }, [isDark]);
+
+  const toggleTheme = useCallback(() => setIsDark((v) => !v), []);
 
   // Collapse the sidebar to an icon-only rail (desktop); persisted across sessions.
   const toggleNavCollapsed = useCallback(() => {
@@ -181,6 +192,9 @@ export default function App() {
           <div className="userPills">
             <span className="pill">{user.profile?.Username || user.username}</span>
             <Badge value={user.profile?.AccountStatus || user.accountStatus || 'Active'} />
+            <button className="themeToggle" onClick={toggleTheme} aria-label={isDark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} title={isDark ? 'Giao diện sáng' : 'Giao diện tối'}>
+              {isDark ? <SunIcon size={16} /> : <MoonIcon size={16} />}
+            </button>
             <div className="avatar">{getInitials(user.profile?.FullName || user.fullName || user.username)}</div>
           </div>
         </header>

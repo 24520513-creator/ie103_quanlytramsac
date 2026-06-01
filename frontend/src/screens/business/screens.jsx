@@ -6,6 +6,7 @@ import { Bars, AreaTrend, Donut } from '../../components/charts';
 import {
   Card, CardHeader, PageHeader, Button, Badge, EmptyState, Loader, Tabs
 } from '../../components/ui';
+import { SQL_HINTS } from '../../lib/sqlHints';
 import {
   BusinessIcon, ReportIcon, PaymentIcon, FranchiseIcon, PlusIcon, ProfileIcon, BoltIcon
 } from '../../components/Icons';
@@ -108,7 +109,7 @@ export function PricingScreen({ ctx, h }) {
   return (
     <div className="ui-stack">
       <PageHeader icon={<PaymentIcon size={22} />} title="Chính sách giá" subtitle="Quản lý biểu giá theo kWh và hệ số cao điểm."
-        actions={h.has('createPricingPolicy') && <Button icon={<PlusIcon size={16} />} onClick={() => setAdd(true)}>Tạo chính sách</Button>} />
+        actions={h.has('createPricingPolicy') && <Button icon={<PlusIcon size={16} />} sqlHint={SQL_HINTS.createPricingPolicy} onClick={() => setAdd(true)}>Tạo chính sách</Button>} />
 
       {loading ? <Loader /> : rows.length === 0 ? <EmptyState title="Chưa có chính sách giá" /> : (
         <div className="ui-grid ui-grid-cards">
@@ -126,10 +127,10 @@ export function PricingScreen({ ctx, h }) {
               </div>
               <div className="ui-row-actions">
                 {h.has('deactivatePricingPolicy') && p.IsActive && (
-                  <Button variant="danger" className="ui-btn-sm" onClick={() => setOff(p)}>Vô hiệu hóa</Button>
+                  <Button variant="danger" className="ui-btn-sm" sqlHint={SQL_HINTS.deactivatePricingPolicy} onClick={() => setOff(p)}>Vô hiệu hóa</Button>
                 )}
                 {h.has('activatePricingPolicy') && !p.IsActive && (
-                  <Button className="ui-btn-sm" onClick={() => setOn(p)}>Kích hoạt</Button>
+                  <Button className="ui-btn-sm" sqlHint={SQL_HINTS.activatePricingPolicy} onClick={() => setOn(p)}>Kích hoạt</Button>
                 )}
               </div>
             </Card>
@@ -166,7 +167,7 @@ export function RefundsScreen({ ctx, h }) {
                 <div><span>Trạm</span><b>{p.StationName}</b></div>
                 <div><span>Thanh toán</span><b>{formatDate(p.PaidAt)}</b></div>
               </div>
-              {h.has('refundPayment') && <Button variant="danger" className="ui-btn-sm" onClick={() => setRefund(p)}>Hoàn tiền</Button>}
+              {h.has('refundPayment') && <Button variant="danger" className="ui-btn-sm" sqlHint={SQL_HINTS.refundPayment} onClick={() => setRefund(p)}>Hoàn tiền</Button>}
             </Card>
           ))}
         </div>
@@ -185,8 +186,8 @@ export function FranchiseMgmtScreen({ ctx, h }) {
       <PageHeader icon={<FranchiseIcon size={22} />} title="Nhượng quyền" subtitle="Chia lợi nhuận, điều chỉnh tỷ lệ và tạo quyết toán cho đối tác."
         actions={(
           <>
-            {h.has('updateRevenueSharePolicy') && <Button variant="ghost" onClick={() => setPolicy(true)}>Cập nhật tỷ lệ chia</Button>}
-            {h.has('createRevenueSettlement') && <Button icon={<PlusIcon size={16} />} onClick={() => setSettle(true)}>Tạo quyết toán</Button>}
+            {h.has('updateRevenueSharePolicy') && <Button variant="ghost" sqlHint={SQL_HINTS.updateRevenueSharePolicy} onClick={() => setPolicy(true)}>Cập nhật tỷ lệ chia</Button>}
+            {h.has('createRevenueSettlement') && <Button icon={<PlusIcon size={16} />} sqlHint={SQL_HINTS.createRevenueSettlement} onClick={() => setSettle(true)}>Tạo quyết toán</Button>}
           </>
         )} />
       {h.has('profitSharing') && <ReportView action={h.get('profitSharing')} token={ctx.token} />}

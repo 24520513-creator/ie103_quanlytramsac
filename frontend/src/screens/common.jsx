@@ -6,9 +6,12 @@ import { Modal, Loader, EmptyState, StatTile, Badge, DataTable, Button, Card, Ca
 import { ActionForm } from '../components/ui/ActionForm';
 import { friendlyError } from '../lib/errors';
 import { BoltIcon, TrendingUpIcon, ActivityIcon, CheckIcon, DownloadIcon } from '../components/Icons';
+import { Bars, AreaTrend, Donut } from '../components/charts';
+import { SQL_HINTS } from '../lib/sqlHints';
 
 const STAT_ICONS = [<BoltIcon size={18} />, <TrendingUpIcon size={18} />, <CheckIcon size={18} />, <ActivityIcon size={18} />];
 const ACCENTS = ['brand', 'info', 'warn', 'bad'];
+const MONEY_RE = /amount|revenue|spend|price|cost|totalrevenue|share/i;
 const RANGE_OPTIONS = [
   { value: 'all', label: 'Tất cả' },
   { value: 'today', label: 'Hôm nay', days: 0 },
@@ -37,6 +40,149 @@ function rangeFromPreset(value) {
   if (preset.months) start.setMonth(end.getMonth() - preset.months);
   if (preset.years) start.setFullYear(end.getFullYear() - preset.years);
   return { FromDate: toIsoDate(start), ToDate: toIsoDate(end) };
+}
+
+function num(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function sum(rows, key) {
+  return rows.reduce((total, row) => total + num(row[key]), 0);
+}
+
+function aggregate(rows, nameKey, valueKey, { countRows = false } = {}) {
+  const map = new Map();
+  rows.forEach((row) => {
+    const label = row[nameKey] ?? 'Không xác định';
+    map.set(label, (map.get(label) || 0) + (countRows ? 1 : num(row[valueKey])));
+  });
+  return [...map.entries()].map(([name, value]) => ({ name: String(name), value }));
+}
+
+function labelByParts(row, parts = []) {
+  const values = parts.map((part) => row[part]).filter((value) => value !== null && value !== undefined && value !== '');
+  if (values.length >= 2 && /month/i.test(parts[0])) return `${values[0]}/${values[1]}`;
+  return values.join(' - ');
+}
+
+function chartConfigFor(action, columns = [], rows = []) {
+  const byId = {
+    stationRevenueDaily: { type: 'line', xKey: 'RevenueDate', yKey: 'RevenueTotal' },
+    stationRevenueByYear: { type: 'bar', xKey: 'RevenueYear', yKey: 'RevenueTotal', aggregate: true },
+    stationRevenue: { type: 'bar', xKey: 'StationName', yKey: 'RevenueTotal', horizontal: true },
+    regionRevenue: { type: 'bar', xKey: 'RegionName', yKey: 'RevenueTotal' },
+    topRevenueStations: { type: 'bar', xKey: 'StationName', yKey: 'RevenueTotal', horizontal: true },
+    peakHours: { type: 'bar', xKey: 'StartHour', yKey: 'SessionCount' },
+    customerGrowth: { type: 'line', parts: ['CreatedMonth', 'CreatedYear'], yKey: 'NewCustomers' },
+    paymentSummary: { type: 'donut', xKey: 'PaymentMethod', yKey: 'TotalAmount' },
+    sessionStatistics: { type: 'donut', xKey: 'SessionStatus', yKey: 'SessionCount' },
+    topCustomerUsage: { type: 'bar', xKey: 'FullName', yKey: 'TotalSpend', horizontal: true },
+    connectorUtilization: { type: 'bar', xKey: 'ConnectorName', yKey: 'TotalRevenue' },
+    systemKpi: { type: 'kpiBars', keys: ['ActiveStations', 'ActivePoints', 'ActiveSessions', 'CompletedSessions', 'FailedSessions', 'OpenTickets'] },
+    profitSharing: { type: 'bar', xKey: 'FranchiseName', yKey: 'PartnerShareAmount', horizontal: true },
+    myFranchiseSettlements: { type: 'line', xKey: 'PeriodEnd', yKey: 'GrossRevenue' },
+    myFranchiseStations: { type: 'donut', xKey: 'StationStatus', countRows: true },
+    myRevenueSharePolicies: { type: 'bar', xKey: 'PolicyCode', yKey: 'PartnerShareRate' },
+    maintenanceKpi: { type: 'bar', xKey: 'StationName', yKeys: ['OpenTicketCount', 'ActiveErrorCount'] },
+    maintenanceTickets: { type: 'donut', xKey: 'TicketStatus', countRows: true },
+    telemetryHealth: { type: 'bar', xKey: 'StationCode', yKey: 'IssueSamples', horizontal: true },
+    errorLogActive: { type: 'donut', xKey: 'Severity', countRows: true },
+    stationStatus: { type: 'bar', xKey: 'StationName', yKeys: ['AvailablePoints', 'ProblemPoints'] },
+    accountsByRole: { type: 'bar', xKey: 'RoleCode', yKey: 'AccountCount' },
+    userRoleSummary: { type: 'donut', xKey: 'AccountStatus', countRows: true },
+    auditLog: { type: 'donut', xKey: 'ActionType', countRows: true },
+    chargingHistory: { type: 'line', xKey: 'StartTime', yKey: 'CostTotal' },
+    invoiceDetail: { type: 'donut', xKey: 'InvoiceStatus', yKey: 'TotalAmount' },
+    myChargingSummary: { type: 'line', parts: ['UsageMonth', 'UsageYear'], yKey: 'TotalSpend' }
+  };
+  if (byId[action.id]) return byId[action.id];
+
+  const sample = rows[0] || {};
+  const stringKey = columns.find((key) => typeof sample[key] === 'string') || columns.find((key) => /status|name|code/i.test(key));
+  const valueKey = columns.find((key) => rows.some((row) => Number.isFinite(Number(row[key]))) && !/id$/i.test(key));
+  if (stringKey && valueKey) return { type: 'bar', xKey: stringKey, yKey: valueKey, horizontal: rows.length > 8 };
+  return null;
+}
+
+function chartRows(rows, cfg) {
+  if (!cfg || !rows.length) return [];
+  if (cfg.type === 'kpiBars') {
+    const row = rows[0] || {};
+    return cfg.keys.filter((key) => row[key] !== undefined).map((key) => ({ name: key, value: num(row[key]) }));
+  }
+  if (cfg.parts) {
+    return rows.map((row) => ({ label: labelByParts(row, cfg.parts), value: num(row[cfg.yKey]) })).reverse();
+  }
+  if (cfg.type === 'donut') return aggregate(rows, cfg.xKey, cfg.yKey, { countRows: cfg.countRows }).sort((a, b) => b.value - a.value);
+  if (cfg.aggregate) return aggregate(rows, cfg.xKey, cfg.yKey).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
+  return rows.slice(0, cfg.type === 'line' ? 18 : 12);
+}
+
+function ReportChart({ action, rows, columns, customChart }) {
+  if (customChart && rows.length > 0) return customChart(rows);
+  const cfg = chartConfigFor(action, columns, rows);
+  const data = chartRows(rows, cfg);
+  if (!cfg || data.length === 0) return null;
+
+  if (cfg.type === 'line') {
+    if (cfg.parts || cfg.aggregate || cfg.type === 'kpiBars') return <AreaTrend data={data} xKey="label" yKey="value" height={300} />;
+    return <AreaTrend data={rows.slice().reverse()} xKey={cfg.xKey} yKey={cfg.yKey} height={300} />;
+  }
+  if (cfg.type === 'donut') return <Donut data={data} nameKey="name" valueKey="value" height={300} />;
+  if (cfg.type === 'kpiBars') return <Bars data={data} xKey="name" yKeys={['value']} height={300} />;
+  if (cfg.yKeys?.length) return <Bars data={data} xKey={cfg.xKey} yKeys={cfg.yKeys} height={320} horizontal={cfg.horizontal} />;
+  if (cfg.aggregate || cfg.parts) return <Bars data={data} xKey="name" yKeys={['value']} height={300} horizontal={cfg.horizontal} />;
+  return <Bars data={data} xKey={cfg.xKey} yKeys={[cfg.yKey]} height={320} horizontal={cfg.horizontal} />;
+}
+
+function reportMetrics(rows, columns) {
+  if (!rows.length) return [];
+  const numericColumns = columns.filter((column) => rows.some((row) => Number.isFinite(Number(row[column]))) && !/id$/i.test(column));
+  const moneyColumn = numericColumns.find((column) => MONEY_RE.test(column));
+  const mainNumeric = numericColumns.find((column) => column !== moneyColumn);
+  const statusColumn = columns.find((column) => /status|severity|priority|method|role/i.test(column));
+  const metrics = [{ label: 'Dòng dữ liệu', value: formatNumber(rows.length), hint: 'bản ghi' }];
+  if (moneyColumn) metrics.push({ label: moneyColumn, value: formatValue(sum(rows, moneyColumn)), hint: 'tổng giá trị' });
+  if (mainNumeric) metrics.push({ label: mainNumeric, value: formatValue(sum(rows, mainNumeric)), hint: 'tổng cộng' });
+  if (statusColumn) metrics.push({ label: statusColumn, value: aggregate(rows, statusColumn, statusColumn, { countRows: true }).sort((a, b) => b.value - a.value)[0]?.name || 'Không có', hint: 'nhóm lớn nhất' });
+  return metrics.slice(0, 4);
+}
+
+function reportInsights(action, rows, columns) {
+  if (!rows.length) return ['Không có dữ liệu trong phạm vi lọc hiện tại.'];
+  const cfg = chartConfigFor(action, columns, rows);
+  const insights = [];
+  if (cfg?.xKey && (cfg.yKey || cfg.countRows)) {
+    const data = aggregate(rows, cfg.xKey, cfg.yKey, { countRows: cfg.countRows }).sort((a, b) => b.value - a.value);
+    const total = data.reduce((acc, item) => acc + item.value, 0);
+    const top = data[0];
+    if (top && total) insights.push(`${top.name} đang chiếm ${formatNumber((top.value / total) * 100)}% trong chỉ số chính của báo cáo.`);
+  }
+  const moneyColumn = columns.find((column) => MONEY_RE.test(column) && rows.some((row) => Number.isFinite(Number(row[column]))));
+  if (moneyColumn) insights.push(`Tổng ${moneyColumn} trong phạm vi hiện tại là ${formatValue(sum(rows, moneyColumn))}.`);
+  if (insights.length < 2) insights.push('Biểu đồ phía trên giúp xác định nhóm nổi bật; bảng chi tiết dùng để truy vết từng bản ghi.');
+  return insights.slice(0, 3);
+}
+
+function ReportBrief({ action, rows, columns }) {
+  const metrics = reportMetrics(rows, columns);
+  const insights = reportInsights(action, rows, columns);
+  return (
+    <div className="report-brief">
+      <div className="report-kpis">
+        {metrics.map((metric, index) => (
+          <StatTile key={`${metric.label}-${index}`} icon={STAT_ICONS[index % STAT_ICONS.length]} label={metric.label} value={metric.value} unit={metric.hint} accent={ACCENTS[index % ACCENTS.length]} />
+        ))}
+      </div>
+      <div className="report-insights">
+        <CardHeader title="Nhận xét quản trị" subtitle="Tóm tắt nhanh từ dữ liệu đang hiển thị" />
+        <ul>
+          {insights.map((item, index) => <li key={index}>{item}</li>)}
+        </ul>
+      </div>
+    </div>
+  );
 }
 
 function DateRangeControls({ value, onChange, compact = false }) {
@@ -202,6 +348,7 @@ export function ReportView({ action, token, chart, columns, body = {} }) {
   }
 
   const cols = (columns?.length ? columns : action.columns?.length ? action.columns : data?.columns) || [];
+  const hasChart = Boolean(chart) || Boolean(chartConfigFor(action, cols, rows));
 
   return (
     <div className="ui-stack">
@@ -209,14 +356,20 @@ export function ReportView({ action, token, chart, columns, body = {} }) {
         <div className="ui-toolbar date-range-toolbar">
           <DateRangeControls value={range} onChange={setRange} />
           <div className="ui-toolbar" style={{ justifyContent: 'flex-end' }}>
-            {action.exportable && <Button variant="ghost" icon={<DownloadIcon size={16} />} disabled={exporting} onClick={() => exportFile('csv')}>Tải CSV</Button>}
-            {action.report && <Button variant="secondary" icon={<DownloadIcon size={16} />} disabled={exporting} onClick={() => exportFile('pdf')}>Tải PDF</Button>}
+            {action.exportable && <Button variant="ghost" icon={<DownloadIcon size={16} />} sqlHint={SQL_HINTS.exportCsv} disabled={exporting} onClick={() => exportFile('csv')}>Tải CSV</Button>}
+            {action.report && <Button variant="secondary" icon={<DownloadIcon size={16} />} sqlHint={SQL_HINTS.exportPdf} disabled={exporting} onClick={() => exportFile('pdf')}>Tải PDF</Button>}
           </div>
         </div>
       ) : null}
       {loading ? <Loader /> : error ? <EmptyState title="Không tải được dữ liệu" message={error} /> : (
         <>
-          {chart && rows.length > 0 && <div className="ui-card">{chart(rows)}</div>}
+          <ReportBrief action={action} rows={rows} columns={cols} />
+          {rows.length > 0 && hasChart && (
+            <div className="ui-card report-chart-card">
+              <CardHeader title="Biểu đồ phân tích" subtitle="Trực quan hóa chỉ số chính trong phạm vi dữ liệu" />
+              <ReportChart action={action} rows={rows} columns={cols} customChart={chart} />
+            </div>
+          )}
           <DataTable
             columns={cols}
             rows={rows}
@@ -262,8 +415,8 @@ export function QuickReports({ h, reports = [], token, onToast, title = 'Xuất 
           <div className="quick-report" key={r.id}>
             <span className="quick-report-name">{r.icon}<span className="u-truncate">{r.label}</span></span>
             <div className="quick-report-actions">
-              <Button variant="ghost" className="ui-btn-sm" icon={<DownloadIcon size={14} />} disabled={busy === `${r.id}:pdf`} onClick={() => download(r, 'pdf')}>PDF</Button>
-              <Button variant="ghost" className="ui-btn-sm" icon={<DownloadIcon size={14} />} disabled={busy === `${r.id}:csv`} onClick={() => download(r, 'csv')}>CSV</Button>
+              <Button variant="ghost" className="ui-btn-sm" icon={<DownloadIcon size={14} />} sqlHint={SQL_HINTS.exportPdf} disabled={busy === `${r.id}:pdf`} onClick={() => download(r, 'pdf')}>PDF</Button>
+              <Button variant="ghost" className="ui-btn-sm" icon={<DownloadIcon size={14} />} sqlHint={SQL_HINTS.exportCsv} disabled={busy === `${r.id}:csv`} onClick={() => download(r, 'csv')}>CSV</Button>
             </div>
           </div>
         ))}

@@ -6,6 +6,7 @@ import { AreaTrend } from '../../components/charts';
 import {
   Card, CardHeader, PageHeader, Button, Badge, EmptyState, Loader, SearchInput, ProgressRing
 } from '../../components/ui';
+import { SQL_HINTS } from '../../lib/sqlHints';
 import {
   MapPinIcon, CarIcon, CalendarIcon, ChargingIcon, PaymentIcon, BoltIcon, PlusIcon,
   DashboardIcon, ClockIcon, DownloadIcon, BatteryIcon, ChevronLeftIcon, ChevronRightIcon
@@ -117,8 +118,8 @@ export function FindStations({ ctx, h }) {
                 <span><BatteryIcon size={14} />{p.ConnectorName || '—'}</span>
               </div>
               <div className="station-actions">
-                <Button variant="ghost" className="ui-btn-sm" icon={<CalendarIcon size={15} />} onClick={() => setBook(p)}>Đặt chỗ</Button>
-                <Button className="ui-btn-sm" icon={<ChargingIcon size={15} />} onClick={() => setStart(p)}>Bắt đầu sạc</Button>
+                <Button variant="ghost" className="ui-btn-sm" icon={<CalendarIcon size={15} />} sqlHint={SQL_HINTS.createBooking} onClick={() => setBook(p)}>Đặt chỗ</Button>
+                <Button className="ui-btn-sm" icon={<ChargingIcon size={15} />} sqlHint={SQL_HINTS.startSession} onClick={() => setStart(p)}>Bắt đầu sạc</Button>
               </div>
             </Card>
           ))}
@@ -173,7 +174,7 @@ export function MyVehicles({ ctx, h }) {
   return (
     <div className="ui-stack">
       <PageHeader icon={<CarIcon size={22} />} title="Xe của tôi" subtitle="Quản lý phương tiện dùng để đặt chỗ và sạc."
-        actions={h.has('createVehicle') && <Button icon={<PlusIcon size={16} />} onClick={() => setAdd(true)}>Thêm xe</Button>} />
+        actions={h.has('createVehicle') && <Button icon={<PlusIcon size={16} />} sqlHint={SQL_HINTS.createVehicle} onClick={() => setAdd(true)}>Thêm xe</Button>} />
 
       {loading ? <Loader /> : rows.length === 0 ? (
         <EmptyState icon={<CarIcon size={26} />} title="Chưa có xe nào" message="Thêm phương tiện đầu tiên để bắt đầu đặt chỗ và sạc." />
@@ -193,7 +194,7 @@ export function MyVehicles({ ctx, h }) {
               </div>
               <div className="vehicle-foot">
                 <Badge value={v.IsActive ? 'Active' : 'Inactive'} />
-                {h.has('updateVehicle') && <Button variant="ghost" className="ui-btn-sm" onClick={() => setEdit(v)}>Sửa</Button>}
+                {h.has('updateVehicle') && <Button variant="ghost" className="ui-btn-sm" sqlHint={SQL_HINTS.updateVehicle} onClick={() => setEdit(v)}>Sửa</Button>}
               </div>
             </Card>
           ))}
@@ -223,7 +224,7 @@ export function Bookings({ ctx, h }) {
   return (
     <div className="ui-stack">
       <PageHeader icon={<CalendarIcon size={22} />} title="Đặt chỗ của tôi" subtitle="Lịch sử đặt chỗ cổng sạc và trạng thái."
-        actions={h.has('createBooking') && <Button icon={<PlusIcon size={16} />} onClick={() => setCreate(true)}>Tạo đặt chỗ</Button>} />
+        actions={h.has('createBooking') && <Button icon={<PlusIcon size={16} />} sqlHint={SQL_HINTS.createBooking} onClick={() => setCreate(true)}>Tạo đặt chỗ</Button>} />
 
       {loading ? <Loader /> : rows.length === 0 ? (
         <EmptyState icon={<CalendarIcon size={26} />} title="Chưa có đặt chỗ" message="Đặt chỗ một cổng sạc từ màn hình Tìm trạm & sạc." />
@@ -241,7 +242,7 @@ export function Bookings({ ctx, h }) {
                 <div className="timeline-time"><ClockIcon size={14} />{formatDate(b.BookedFrom)} → {formatDate(b.BookedTo)}</div>
               </div>
               {h.has('cancelBooking') && canCancel(b.BookingStatus) && (
-                <Button variant="danger" className="ui-btn-sm" onClick={() => setCancel(b)}>Huỷ</Button>
+                <Button variant="danger" className="ui-btn-sm" sqlHint={SQL_HINTS.cancelBooking} onClick={() => setCancel(b)}>Huỷ</Button>
               )}
             </Card>
           ))}
@@ -283,7 +284,7 @@ export function Sessions({ ctx, h }) {
   return (
     <div className="ui-stack">
       <PageHeader icon={<ChargingIcon size={22} />} title="Phiên sạc" subtitle="Theo dõi phiên đang sạc, hoàn tất thanh toán và xem lịch sử."
-        actions={h.has('startSession') && <Button icon={<BoltIcon size={16} />} onClick={() => setStart(true)}>Bắt đầu phiên</Button>} />
+        actions={h.has('startSession') && <Button icon={<BoltIcon size={16} />} sqlHint={SQL_HINTS.startSession} onClick={() => setStart(true)}>Bắt đầu phiên</Button>} />
 
       {loading ? <Loader /> : rows.length === 0 ? (
         <EmptyState icon={<ChargingIcon size={26} />} title="Chưa có phiên sạc" message="Bắt đầu một phiên sạc từ màn hình Tìm trạm & sạc." />
@@ -308,9 +309,9 @@ export function Sessions({ ctx, h }) {
                     <div><span>Chi phí</span><b>{formatVND(s.CostTotal)}</b></div>
                   </div>
                   <div className="session-actions">
-                    {active && h.has('endSession') && <Button className="ui-btn-sm" onClick={() => setEnd(s)}>Kết thúc</Button>}
-                    {payableIds.has(String(s.SessionID)) && h.has('createPayment') && <Button variant="ghost" className="ui-btn-sm" icon={<PaymentIcon size={14} />} onClick={() => setPay(s)}>Thanh toán</Button>}
-                    {invoiceableIds.has(String(s.SessionID)) && h.has('createInvoice') && <Button variant="ghost" className="ui-btn-sm" onClick={() => setInvoice(s)}>Lập hoá đơn</Button>}
+                    {active && h.has('endSession') && <Button className="ui-btn-sm" sqlHint={SQL_HINTS.endSession} onClick={() => setEnd(s)}>Kết thúc</Button>}
+                    {payableIds.has(String(s.SessionID)) && h.has('createPayment') && <Button variant="ghost" className="ui-btn-sm" icon={<PaymentIcon size={14} />} sqlHint={SQL_HINTS.createPayment} onClick={() => setPay(s)}>Thanh toán</Button>}
+                    {invoiceableIds.has(String(s.SessionID)) && h.has('createInvoice') && <Button variant="ghost" className="ui-btn-sm" sqlHint={SQL_HINTS.createInvoice} onClick={() => setInvoice(s)}>Lập hoá đơn</Button>}
                   </div>
                 </div>
               </Card>

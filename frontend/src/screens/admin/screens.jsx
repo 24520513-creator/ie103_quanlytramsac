@@ -6,6 +6,7 @@ import { Donut } from '../../components/charts';
 import {
   Card, CardHeader, PageHeader, Button, Badge, EmptyState, Loader, SearchInput, DataTable, Tabs
 } from '../../components/ui';
+import { SQL_HINTS } from '../../lib/sqlHints';
 import {
   AdminIcon, ProfileIcon, LockIcon, UnlockIcon, ReportIcon, PlusIcon, ActivityIcon
 } from '../../components/Icons';
@@ -86,11 +87,11 @@ export function UsersScreen({ ctx, h }) {
     if (col === 'Thao tác') {
       return (
         <div className="row-actions">
-          {h.has('lockUser') && !isLocked(row.AccountStatus) && <Button variant="ghost" className="ui-btn-sm" icon={<LockIcon size={13} />} onClick={() => setLock(row)}>Khoá</Button>}
-          {h.has('unlockUser') && isLocked(row.AccountStatus) && <Button variant="soft" className="ui-btn-sm" icon={<UnlockIcon size={13} />} onClick={() => setUnlock(row)}>Mở</Button>}
-          {h.has('resetPassword') && <Button variant="ghost" className="ui-btn-sm" onClick={() => setReset(row)}>Reset</Button>}
-          {h.has('assignRole') && <Button variant="ghost" className="ui-btn-sm" onClick={() => setAssign(row)}>+Vai trò</Button>}
-          {h.has('removeRole') && <Button variant="ghost" className="ui-btn-sm" onClick={() => setRemove(row)}>−Vai trò</Button>}
+          {h.has('lockUser') && !isLocked(row.AccountStatus) && <Button variant="ghost" className="ui-btn-sm" icon={<LockIcon size={13} />} sqlHint={SQL_HINTS.lockUser} onClick={() => setLock(row)}>Khoá</Button>}
+          {h.has('unlockUser') && isLocked(row.AccountStatus) && <Button variant="soft" className="ui-btn-sm" icon={<UnlockIcon size={13} />} sqlHint={SQL_HINTS.unlockUser} onClick={() => setUnlock(row)}>Mở</Button>}
+          {h.has('resetPassword') && <Button variant="ghost" className="ui-btn-sm" sqlHint={SQL_HINTS.adminResetPassword} onClick={() => setReset(row)}>Reset</Button>}
+          {h.has('assignRole') && <Button variant="ghost" className="ui-btn-sm" sqlHint={SQL_HINTS.assignRole} onClick={() => setAssign(row)}>+Vai trò</Button>}
+          {h.has('removeRole') && <Button variant="ghost" className="ui-btn-sm" sqlHint={SQL_HINTS.removeRole} onClick={() => setRemove(row)}>−Vai trò</Button>}
         </div>
       );
     }
@@ -101,7 +102,7 @@ export function UsersScreen({ ctx, h }) {
   return (
     <div className="ui-stack">
       <PageHeader icon={<AdminIcon size={22} />} title="Quản lý người dùng" subtitle="Tài khoản, trạng thái và vai trò. Thao tác trực tiếp trên từng dòng."
-        actions={h.has('createUser') && <Button icon={<PlusIcon size={16} />} onClick={() => setCreate(true)}>Tạo tài khoản</Button>} />
+        actions={h.has('createUser') && <Button icon={<PlusIcon size={16} />} sqlHint={SQL_HINTS.createUser} onClick={() => setCreate(true)}>Tạo tài khoản</Button>} />
       <div className="ui-toolbar">
         <SearchInput value={search} onChange={setSearch} onSubmit={doSearch} placeholder="Tìm theo tên, email, vai trò..." />
       </div>

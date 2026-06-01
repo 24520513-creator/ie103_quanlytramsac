@@ -1,15 +1,17 @@
 import React, { useEffect, useId, useRef } from 'react';
 import { CloseIcon, SearchIcon, SpinnerIcon, ChevronLeftIcon, ChevronRightIcon } from '../Icons';
 import { statusClass, formatValue } from '../../lib/format';
+import { SqlTooltip } from '../SqlTooltip';
 
 /* ------------------------------ Buttons ------------------------------ */
-export function Button({ variant = 'primary', icon, children, className = '', ...rest }) {
-  return (
+export function Button({ variant = 'primary', icon, children, className = '', sqlHint, ...rest }) {
+  const btn = (
     <button className={`ui-btn ui-btn-${variant} ${className}`} {...rest}>
       {icon}
       {children && <span>{children}</span>}
     </button>
   );
+  return sqlHint ? <SqlTooltip hint={sqlHint}>{btn}</SqlTooltip> : btn;
 }
 
 /* ------------------------------ Section header ------------------------------ */
@@ -76,7 +78,14 @@ export function EmptyState({ icon, title = 'Không có dữ liệu', message }) 
 }
 
 export function Loader({ label = 'Đang tải...' }) {
-  return <div className="ui-loader"><SpinnerIcon size={18} /><span>{label}</span></div>;
+  return (
+    <div className="ui-loader">
+      <span className="ui-loader-dots" aria-hidden="true">
+        <span /><span /><span />
+      </span>
+      <span>{label}</span>
+    </div>
+  );
 }
 
 /* ------------------------------ Modal ------------------------------ */

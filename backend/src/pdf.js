@@ -106,14 +106,27 @@ function numeric(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function labelFor(row, key, options = {}) {
+  if (options.labelParts?.length) {
+    const parts = options.labelParts.map((part) => row[part]).filter((value) => value !== null && value !== undefined && value !== '');
+    if (parts.length >= 2 && /month/i.test(options.labelParts[0])) return `${parts[0]}/${parts[1]}`;
+    return parts.join(' - ');
+  }
+  const value = row[key];
+  if (value instanceof Date) return formatDate(value);
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) return formatDate(value);
+  return value ?? 'Không xác định';
+}
+
 function summarizeRows(rows, key) {
   return rows.reduce((sum, row) => sum + numeric(row[key]), 0);
 }
 
-function aggregateRows(rows, labelKey, valueKey, { countRows = false } = {}) {
+function aggregateRows(rows, labelKey, valueKey, options = {}) {
+  const { countRows = false } = options;
   const map = new Map();
   for (const row of rows) {
-    const label = row[labelKey] ?? 'Không xác định';
+    const label = labelFor(row, labelKey, options);
     const value = countRows ? 1 : numeric(row[valueKey]);
     map.set(label, (map.get(label) || 0) + value);
   }
@@ -128,6 +141,11 @@ function getTop(rows, labelKey, valueKey, options = {}) {
 function metricValue(metric, rows) {
   if (metric.op === 'countRows') return rows.length;
   if (metric.op === 'sum') return summarizeRows(rows, metric.key);
+  if (metric.op === 'avg') {
+    const values = rows.map((row) => numeric(row[metric.key])).filter((value) => Number.isFinite(value));
+    return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+  }
+  if (metric.op === 'max') return Math.max(0, ...rows.map((row) => numeric(row[metric.key])));
   if (metric.op === 'countDistinct') return new Set(rows.map((row) => row[metric.key]).filter((value) => value !== null && value !== undefined && value !== '')).size;
   if (metric.op === 'topLabel') return getTop(rows, metric.labelKey, metric.valueKey, metric)?.label || 'Không có';
   return '';
@@ -154,13 +172,40 @@ function buildInsights(rows, template) {
   const rules = template?.insightRules || [];
   const insights = [];
   for (const rule of rules) {
-    const top = getTop(rows, rule.labelKey, rule.valueKey, rule);
-    if (!top) continue;
     if (rule.type === 'share') {
+      const top = getTop(rows, rule.labelKey, rule.valueKey, rule);
+      if (!top) continue;
       const total = aggregateRows(rows, rule.labelKey, rule.valueKey, rule).reduce((sum, item) => sum + item.value, 0);
       const share = total ? (top.value / total) * 100 : 0;
       insights.push(`${top.label} chiếm tỷ trọng lớn nhất theo ${rule.metricLabel || 'chỉ số'} (${formatPercent(share)}).`);
+    } else if (rule.type === 'concentration') {
+      const data = aggregateRows(rows, rule.labelKey, rule.valueKey, rule).sort((a, b) => b.value - a.value);
+      const total = data.reduce((sum, item) => sum + item.value, 0);
+      const topN = data.slice(0, rule.topN || 3).reduce((sum, item) => sum + item.value, 0);
+      if (total) insights.push(`Top ${Math.min(rule.topN || 3, data.length)} đóng góp ${formatPercent((topN / total) * 100)} ${rule.metricLabel || 'giá trị'}, cần theo dõi mức độ phụ thuộc vào nhóm dẫn đầu.`);
+    } else if (rule.type === 'trend') {
+      const data = aggregateRows(rows, rule.labelKey, rule.valueKey, rule).sort((a, b) => String(a.label).localeCompare(String(b.label), 'vi'));
+      if (data.length >= 2) {
+        const first = data[0].value;
+        const last = data[data.length - 1].value;
+        const delta = first ? ((last - first) / first) * 100 : 0;
+        const direction = last >= first ? 'tăng' : 'giảm';
+        insights.push(`${rule.metricLabel || 'Chỉ số'} ${direction} ${formatPercent(Math.abs(delta))} từ kỳ đầu đến kỳ cuối của phạm vi báo cáo.`);
+      }
+    } else if (rule.type === 'ratio') {
+      const numerator = summarizeRows(rows, rule.numeratorKey);
+      const denominator = summarizeRows(rows, rule.denominatorKey);
+      const ratio = denominator ? (numerator / denominator) * 100 : 0;
+      insights.push(`${rule.metricLabel || 'Tỷ lệ'} hiện ở mức ${formatPercent(ratio)} (${formatNumber(numerator)}/${formatNumber(denominator)}).`);
+    } else if (rule.type === 'risk') {
+      const value = summarizeRows(rows, rule.key);
+      const threshold = Number(rule.threshold || 0);
+      insights.push(value > threshold
+        ? `${formatNumber(value)} ${rule.metricLabel || 'vấn đề'} cần được xử lý hoặc theo dõi trong kỳ.`
+        : `Không ghi nhận ${rule.metricLabel || 'vấn đề'} vượt ngưỡng trong kỳ.`);
     } else {
+      const top = getTop(rows, rule.labelKey, rule.valueKey, rule);
+      if (!top) continue;
       insights.push(`${top.label} có ${rule.metricLabel || 'giá trị'} cao nhất (${formatCell(top.value, rule.valueKey)}).`);
     }
   }
@@ -249,6 +294,12 @@ function renderKpiCards(doc, rows, columns, template) {
 
 function prepareChartData(rows, chart) {
   if (!chart || chart.type === 'none' || !rows.length) return [];
+  if (chart.pivotMetrics?.length) {
+    const source = rows[0] || {};
+    return chart.pivotMetrics
+      .filter((key) => source[key] !== undefined && source[key] !== null)
+      .map((key) => ({ label: key, value: numeric(source[key]) }));
+  }
   if (chart.type === 'donut') return aggregateRows(rows, chart.nameKey, chart.valueKey, chart).sort((a, b) => b.value - a.value).slice(0, 8);
   if (chart.aggregate) {
     const valueKey = chart.yKey || chart.yKeys?.[0];
@@ -256,7 +307,7 @@ function prepareChartData(rows, chart) {
   }
   const valueKey = chart.yKey || chart.yKeys?.[0];
   return rows
-    .map((row) => ({ label: String(row[chart.xKey] ?? ''), value: numeric(row[valueKey]), raw: row }))
+    .map((row) => ({ label: String(labelFor(row, chart.xKey, chart)), value: chart.countRows ? 1 : numeric(row[valueKey]), raw: row }))
     .sort((a, b) => chart.type === 'line' ? 0 : b.value - a.value)
     .slice(0, chart.type === 'line' ? 14 : 10);
 }
@@ -387,7 +438,7 @@ function renderChart(doc, rows, template) {
 
 function renderInsights(doc, rows, template) {
   const insights = buildInsights(rows, template);
-  drawSectionTitle(doc, 'Nhận xét nhanh');
+  drawSectionTitle(doc, 'Kết luận quản trị');
   const height = 28 + insights.length * 18;
   ensureSpace(doc, height);
   const y = doc.y;
@@ -395,6 +446,27 @@ function renderInsights(doc, rows, template) {
   insights.forEach((item, index) => {
     doc.circle(PAGE.margin + 16, y + 18 + index * 18, 3).fill(PALETTE[index % PALETTE.length]);
     font(doc).fontSize(9).fillColor(COLORS.ink).text(item, PAGE.margin + 28, y + 12 + index * 18, { width: PAGE.contentWidth - 42 });
+  });
+  doc.y = y + height + 4;
+}
+
+function renderRecommendations(doc, rows, template) {
+  if (!rows.length) return;
+  const rules = template?.insightRules || [];
+  const suggestions = [];
+  if (rules.some((rule) => rule.type === 'risk')) suggestions.push('Ưu tiên xử lý các điểm có rủi ro cao trước khi mở rộng quy mô vận hành.');
+  if (rules.some((rule) => rule.type === 'concentration')) suggestions.push('Theo dõi nhóm đóng góp lớn nhất để tránh phụ thuộc doanh thu hoặc tải vận hành vào một cụm nhỏ.');
+  if (rules.some((rule) => rule.type === 'trend')) suggestions.push('So sánh xu hướng kỳ này với kỳ trước trong cuộc họp vận hành để xác định nguyên nhân tăng/giảm.');
+  if (!suggestions.length) suggestions.push('Dùng bảng chi tiết để khoanh vùng bản ghi bất thường và lập hành động tiếp theo.');
+
+  drawSectionTitle(doc, 'Đề xuất hành động');
+  const height = 28 + suggestions.length * 18;
+  ensureSpace(doc, height);
+  const y = doc.y;
+  doc.roundedRect(PAGE.margin, y, PAGE.contentWidth, height, 5).fill(COLORS.white).strokeColor(COLORS.line).stroke();
+  suggestions.slice(0, 3).forEach((item, index) => {
+    font(doc, 'bold').fontSize(8).fillColor(COLORS.brand).text(`${index + 1}.`, PAGE.margin + 14, y + 12 + index * 18, { width: 16 });
+    font(doc).fontSize(9).fillColor(COLORS.ink).text(item, PAGE.margin + 34, y + 12 + index * 18, { width: PAGE.contentWidth - 48 });
   });
   doc.y = y + height + 4;
 }
@@ -502,6 +574,7 @@ export async function buildReportPdf(actionId, user, body = {}) {
   renderKpiCards(doc, rows, columns, template);
   renderChart(doc, rows, template);
   renderInsights(doc, rows, template);
+  renderRecommendations(doc, rows, template);
   renderDataTable(doc, columns, rows);
   renderSignature(doc, user, issuedAt);
   renderFooters(doc);
