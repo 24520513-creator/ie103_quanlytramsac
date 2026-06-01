@@ -65,6 +65,36 @@ CREATE TABLE [Identity].UserRole
 );
 GO
 
+CREATE TABLE [Identity].AuthToken
+(
+    AuthTokenID BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_AuthToken PRIMARY KEY,
+    UserID INT NOT NULL,
+    TokenType NVARCHAR(30) NOT NULL,
+    TokenHash NVARCHAR(128) NOT NULL CONSTRAINT UQ_AuthToken_TokenHash UNIQUE,
+    ExpiresAt DATETIME2 NOT NULL,
+    ConsumedAt DATETIME2 NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_AuthToken_User FOREIGN KEY (UserID) REFERENCES [Identity].UserAccount(UserID),
+    CONSTRAINT CK_AuthToken_Type CHECK (TokenType IN (N'PasswordReset', N'EmailVerification'))
+);
+GO
+
+CREATE TABLE [Identity].AuthEvent
+(
+    AuthEventID BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_AuthEvent PRIMARY KEY,
+    UserID INT NULL,
+    Identifier NVARCHAR(120) NULL,
+    EventType NVARCHAR(40) NOT NULL,
+    EventStatus NVARCHAR(20) NOT NULL,
+    IpAddress NVARCHAR(45) NULL,
+    UserAgent NVARCHAR(300) NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_AuthEvent_User FOREIGN KEY (UserID) REFERENCES [Identity].UserAccount(UserID),
+    CONSTRAINT CK_AuthEvent_Type CHECK (EventType IN (N'Register', N'Login', N'Logout', N'PasswordResetRequested', N'PasswordResetCompleted', N'EmailVerified')),
+    CONSTRAINT CK_AuthEvent_Status CHECK (EventStatus IN (N'Success', N'Failed', N'Ignored'))
+);
+GO
+
 CREATE TABLE Franchise.FranchisePartner
 (
     FranchiseID INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_FranchisePartner PRIMARY KEY,
