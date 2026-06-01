@@ -10,6 +10,7 @@ export function useActionData(actionId, { token, body = {}, auto = true } = {}) 
   const [loading, setLoading] = useState(Boolean(auto));
   const [error, setError] = useState('');
   const bodyRef = useRef(body);
+  const bodyKey = JSON.stringify(body);
   bodyRef.current = body;
 
   const reload = useCallback(async (override = {}) => {
@@ -30,7 +31,7 @@ export function useActionData(actionId, { token, body = {}, auto = true } = {}) 
   useEffect(() => {
     if (auto) reload().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actionId, auto]);
+  }, [actionId, auto, bodyKey]);
 
   return { data, rows: data?.rows || [], summary: data?.summary || {}, loading, error, reload };
 }

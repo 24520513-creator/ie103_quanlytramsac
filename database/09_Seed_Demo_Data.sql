@@ -41,48 +41,48 @@ DISABLE TRIGGER ALL ON Payments.PaymentTransaction;
 DISABLE TRIGGER ALL ON Maintenance.MaintenanceTicket;
 
 /* ============================================================
-   1) REGION (~40 tinh, co trong so StationCount; mien nui 0-1)
+   1) REGION (~40 tinh, co trong so StationCount; tong 25 tram, nhieu cong/tram)
    ============================================================ */
 DECLARE @Prov TABLE (RegionCode NVARCHAR(20), RegionName NVARCHAR(100), Tier INT, StationCount INT);
 INSERT INTO @Prov (RegionCode, RegionName, Tier, StationCount) VALUES
 -- Tier 1: sieu do thi
-(N'HCM',  N'TP Ho Chi Minh', 1, 26),
-(N'HN',   N'Ha Noi',         1, 22),
-(N'DNG',  N'Da Nang',        1, 10),
-(N'BD',   N'Binh Duong',     1,  8),
-(N'HP',   N'Hai Phong',      1,  7),
-(N'DN',   N'Dong Nai',       1,  7),
-(N'CT',   N'Can Tho',        1,  5),
+(N'HCM',  N'TP Ho Chi Minh', 1,  5),
+(N'HN',   N'Ha Noi',         1,  4),
+(N'DNG',  N'Da Nang',        1,  2),
+(N'BD',   N'Binh Duong',     1,  1),
+(N'HP',   N'Hai Phong',      1,  1),
+(N'DN',   N'Dong Nai',       1,  1),
+(N'CT',   N'Can Tho',        1,  1),
 -- Tier 2: tinh/thanh lon
-(N'BRVT', N'Ba Ria - Vung Tau', 2, 5),
-(N'KH',   N'Khanh Hoa',      2, 5),
-(N'QNI',  N'Quang Ninh',     2, 4),
-(N'LD',   N'Lam Dong',       2, 4),
-(N'NA',   N'Nghe An',        2, 4),
-(N'TH',   N'Thanh Hoa',      2, 4),
-(N'TTH',  N'Thua Thien Hue', 2, 4),
-(N'BN',   N'Bac Ninh',       2, 3),
-(N'HD',   N'Hai Duong',      2, 3),
-(N'LA',   N'Long An',        2, 3),
-(N'TG',   N'Tien Giang',     2, 3),
-(N'VP',   N'Vinh Phuc',      2, 3),
-(N'AG',   N'An Giang',       2, 3),
-(N'KG',   N'Kien Giang',     2, 3),
+(N'BRVT', N'Ba Ria - Vung Tau', 2, 1),
+(N'KH',   N'Khanh Hoa',      2, 1),
+(N'QNI',  N'Quang Ninh',     2, 1),
+(N'LD',   N'Lam Dong',       2, 1),
+(N'NA',   N'Nghe An',        2, 1),
+(N'TH',   N'Thanh Hoa',      2, 1),
+(N'TTH',  N'Thua Thien Hue', 2, 1),
+(N'BN',   N'Bac Ninh',       2, 1),
+(N'HD',   N'Hai Duong',      2, 1),
+(N'LA',   N'Long An',        2, 1),
+(N'TG',   N'Tien Giang',     2, 0),
+(N'VP',   N'Vinh Phuc',      2, 0),
+(N'AG',   N'An Giang',       2, 0),
+(N'KG',   N'Kien Giang',     2, 0),
 -- Tier 3: tinh nho
-(N'QNM',  N'Quang Nam',      3, 2),
-(N'BTH',  N'Binh Thuan',     3, 2),
-(N'GL',   N'Gia Lai',        3, 2),
-(N'DLK',  N'Dak Lak',        3, 2),
-(N'TN',   N'Tay Ninh',       3, 1),
-(N'HNM',  N'Ha Nam',         3, 1),
-(N'NB',   N'Ninh Binh',      3, 1),
-(N'TB',   N'Thai Binh',      3, 1),
-(N'PT',   N'Phu Tho',        3, 1),
-(N'BG',   N'Bac Giang',      3, 1),
+(N'QNM',  N'Quang Nam',      3, 0),
+(N'BTH',  N'Binh Thuan',     3, 0),
+(N'GL',   N'Gia Lai',        3, 0),
+(N'DLK',  N'Dak Lak',        3, 0),
+(N'TN',   N'Tay Ninh',       3, 0),
+(N'HNM',  N'Ha Nam',         3, 0),
+(N'NB',   N'Ninh Binh',      3, 0),
+(N'TB',   N'Thai Binh',      3, 0),
+(N'PT',   N'Phu Tho',        3, 0),
+(N'BG',   N'Bac Giang',      3, 0),
 -- Tier 4: mien nui (0-1 tram)
-(N'LCI',  N'Lao Cai',        4, 1),
-(N'HG',   N'Ha Giang',       4, 1),
-(N'SL',   N'Son La',         4, 1),
+(N'LCI',  N'Lao Cai',        4, 0),
+(N'HG',   N'Ha Giang',       4, 0),
+(N'SL',   N'Son La',         4, 0),
 (N'DB',   N'Dien Bien',      4, 0),
 (N'LCH',  N'Lai Chau',       4, 0),
 (N'CB',   N'Cao Bang',       4, 0),
@@ -132,37 +132,37 @@ INSERT INTO [Identity].UserAccount (Username, Email, Phone, PasswordHash, FullNa
 -- Operations staff (28): ~1 nguoi / 5-6 tram
 WITH N AS (SELECT TOP (28) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n FROM sys.all_objects)
 INSERT INTO [Identity].UserAccount (Username, Email, Phone, PasswordHash, FullName)
-SELECT N'operator' + RIGHT(N'00' + CAST(n AS NVARCHAR(10)), 2),
-       N'operator' + RIGHT(N'00' + CAST(n AS NVARCHAR(10)), 2) + N'@ev.vn',
-       N'0901' + RIGHT(N'0000000' + CAST(200000 + n AS NVARCHAR(10)), 7),
+SELECT N'operator' + RIGHT(N'00' + CAST(N.n AS NVARCHAR(10)), 2),
+       N'operator' + RIGHT(N'00' + CAST(N.n AS NVARCHAR(10)), 2) + N'@ev.vn',
+       N'0901' + RIGHT(N'0000000' + CAST(200000 + N.n AS NVARCHAR(10)), 7),
        @Hash,
        vn.FullName
 FROM N
-JOIN @VietnameseNames vn ON vn.n = n.n;
+JOIN @VietnameseNames vn ON vn.n = N.n;
 
 -- Franchise partner users (15)
 WITH N AS (SELECT TOP (15) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n FROM sys.all_objects)
 INSERT INTO [Identity].UserAccount (Username, Email, Phone, PasswordHash, FullName)
-SELECT N'franchise' + RIGHT(N'00' + CAST(n AS NVARCHAR(10)), 2),
-       N'franchise' + RIGHT(N'00' + CAST(n AS NVARCHAR(10)), 2) + N'@ev.vn',
-       N'093' + RIGHT(N'0000000' + CAST(n AS NVARCHAR(10)), 7),
+SELECT N'franchise' + RIGHT(N'00' + CAST(N.n AS NVARCHAR(10)), 2),
+       N'franchise' + RIGHT(N'00' + CAST(N.n AS NVARCHAR(10)), 2) + N'@ev.vn',
+       N'093' + RIGHT(N'0000000' + CAST(N.n AS NVARCHAR(10)), 7),
        @Hash,
        vn.FullName
 FROM N
-JOIN @VietnameseNames vn ON vn.n = n.n + 28;
+JOIN @VietnameseNames vn ON vn.n = N.n + 28;
 
 -- Customers (500), CreatedAt rai deu ~2 nam (hoi nghieng ve gan day)
 WITH N AS (SELECT TOP (500) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n FROM sys.all_objects a CROSS JOIN sys.all_objects b)
 INSERT INTO [Identity].UserAccount (Username, Email, Phone, PasswordHash, FullName, AccountStatus, CreatedAt)
-SELECT CASE WHEN n <= 99 THEN N'customer' + RIGHT(N'00' + CAST(n AS NVARCHAR(10)), 2) ELSE N'customer' + CAST(n AS NVARCHAR(10)) END,
-       CASE WHEN n <= 99 THEN N'customer' + RIGHT(N'00' + CAST(n AS NVARCHAR(10)), 2) ELSE N'customer' + CAST(n AS NVARCHAR(10)) END + N'@gmail.com',
-       N'091' + RIGHT(N'0000000' + CAST(n AS NVARCHAR(10)), 7),
+SELECT CASE WHEN N.n <= 99 THEN N'customer' + RIGHT(N'00' + CAST(N.n AS NVARCHAR(10)), 2) ELSE N'customer' + CAST(N.n AS NVARCHAR(10)) END,
+       CASE WHEN N.n <= 99 THEN N'customer' + RIGHT(N'00' + CAST(N.n AS NVARCHAR(10)), 2) ELSE N'customer' + CAST(N.n AS NVARCHAR(10)) END + N'@gmail.com',
+       N'091' + RIGHT(N'0000000' + CAST(N.n AS NVARCHAR(10)), 7),
        @Hash,
-       vn.FullName + N' ' + RIGHT(N'000' + CAST(n AS NVARCHAR(10)), 3),
-       CASE WHEN n % 71 = 0 THEN N'Suspended' WHEN n % 97 = 0 THEN N'Locked' WHEN n % 53 = 0 THEN N'Pending' ELSE N'Active' END,
-       DATEADD(DAY, CAST(@Days * SQRT((ABS(CHECKSUM(n)) % 100000) / 100000.0) AS INT), @StartDate)
+       vn.FullName + N' ' + RIGHT(N'000' + CAST(N.n AS NVARCHAR(10)), 3),
+       CASE WHEN N.n % 71 = 0 THEN N'Suspended' WHEN N.n % 97 = 0 THEN N'Locked' WHEN N.n % 53 = 0 THEN N'Pending' ELSE N'Active' END,
+       DATEADD(DAY, CAST(@Days * SQRT((ABS(CHECKSUM(N.n)) % 100000) / 100000.0) AS INT), @StartDate)
 FROM N
-JOIN @VietnameseNames vn ON vn.n = ((n.n - 1) % 60) + 1;
+JOIN @VietnameseNames vn ON vn.n = ((N.n - 1) % 60) + 1;
 
 INSERT INTO [Identity].UserRole (UserID, RoleID)
 SELECT u.UserID, r.RoleID
@@ -306,10 +306,10 @@ SELECT e.seq, e.RegionID, e.RegionCode, e.RegionName, e.Tier, e.k,
                  WHEN 2 THEN (CASE seq % 2 WHEN 0 THEN 150 ELSE 120 END)
                  WHEN 3 THEN 120 ELSE 60 END AS MaxPowerKW,
        -- So cong theo tier
-       CASE e.Tier WHEN 1 THEN 6 + (seq % 5)     -- 6..10
-                 WHEN 2 THEN 3 + (seq % 3)     -- 3..5
-                 WHEN 3 THEN 2 + (seq % 2)     -- 2..3
-                 ELSE 1 + (seq % 2) END AS PointCount, -- 1..2
+       CASE e.Tier WHEN 1 THEN 24 + (seq % 9)    -- 24..32
+                 WHEN 2 THEN 12 + (seq % 7)    -- 12..18
+                 WHEN 3 THEN 8 + (seq % 5)     -- 8..12
+                 ELSE 6 + (seq % 3) END AS PointCount, -- 6..8
        CASE WHEN seq % 29 = 0 THEN N'UnderMaintenance'
             WHEN seq % 53 = 0 THEN N'Inactive'
             ELSE N'Active' END AS StationStatus,
@@ -362,15 +362,15 @@ UNION ALL SELECT StationID, @GBT FROM Infrastructure.ChargingStation WHERE Stati
 /* ============================================================
    6) CHARGING POINTS — expand theo PointCount tung tram
    ============================================================ */
-;WITH Tally AS (SELECT TOP (12) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS k FROM sys.all_objects)
+;WITH Tally AS (SELECT TOP (32) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS k FROM sys.all_objects)
 INSERT INTO Infrastructure.ChargingPoint (PointCode, StationID, ConnectorTypeID, PowerKW, SerialNumber, PointStatus, HealthStatus)
-SELECT s.StationCode + N'-' + CHAR(64 + t.k),
+SELECT s.StationCode + N'-P' + RIGHT(N'00' + CAST(t.k AS NVARCHAR(10)), 2),
        s.StationID,
        CASE (s.StationID + t.k) % 5 WHEN 0 THEN @T2 WHEN 1 THEN @CCS2 WHEN 2 THEN @CCS2 WHEN 3 THEN @CHA ELSE @GBT END,
        CASE WHEN (s.StationID + t.k) % 5 = 0 THEN 22
             WHEN (s.StationID + t.k) % 5 IN (1,2) THEN CASE WHEN s.MaxPowerKW >= 150 THEN 150 ELSE s.MaxPowerKW END
             WHEN (s.StationID + t.k) % 5 = 3 THEN 60 ELSE 120 END,
-       N'SN-' + s.StationCode + N'-' + CHAR(64 + t.k),
+       N'SN-' + s.StationCode + N'-P' + RIGHT(N'00' + CAST(t.k AS NVARCHAR(10)), 2),
        CASE WHEN s.StationStatus <> N'Active' THEN N'Maintenance'
             WHEN (s.StationID * 7 + t.k) % 113 = 0 THEN N'Maintenance'
             WHEN (s.StationID * 7 + t.k) % 97 = 0 THEN N'Offline'
@@ -504,24 +504,8 @@ GROUP BY RegionID;
            CAST(100000 + (n.Seq * 8.5) AS DECIMAL(14,4)) AS MeterStart,
            (n.Seq % 11) AS PolicyBucket
     FROM #Nums n
-    JOIN #Customers c ON c.CustomerRow =
-        CASE WHEN ABS(CHECKSUM(n.Seq, 37)) % 100 < 45 THEN (ABS(CHECKSUM(n.Seq, 137)) % 100) + 1
-             WHEN ABS(CHECKSUM(n.Seq, 37)) % 100 < 82 THEN (ABS(CHECKSUM(n.Seq, 237)) % 250) + 101
-             ELSE (ABS(CHECKSUM(n.Seq, 337)) % 150) + 351 END
-    CROSS APPLY (
-        SELECT TOP 1 RegionID
-        FROM (SELECT DISTINCT RegionID FROM #StationPlan) sr
-        ORDER BY ABS(CHECKSUM(n.Seq, c.UserID, sr.RegionID))
-    ) travel
-    CROSS APPLY (
-        SELECT CASE
-            WHEN ABS(CHECKSUM(n.Seq, c.UserID, 19)) % 100 <
-                 CASE c.DriverSegment WHEN N'FrequentCommuter' THEN 88 WHEN N'UrbanCasual' THEN 76 ELSE 58 END
-            THEN c.HomeRegionID ELSE travel.RegionID END AS RegionID
-    ) target
-    JOIN #RegionPointCount rpc ON rpc.RegionID = target.RegionID
-    JOIN #Points pt ON pt.RegionID = target.RegionID
-                   AND pt.rnRegion = (ABS(CHECKSUM(n.Seq, 101)) % rpc.PointCount) + 1
+    JOIN #Customers c ON c.CustomerRow = (((n.Seq - 1) + (((n.Seq - 1) / @CustTotal) * 37)) % @CustTotal) + 1
+    JOIN #Points pt ON pt.rn = (((n.Seq - 1) * 37) % @PointTotal) + 1
 )
 SELECT Seq, UserID, VehicleID, PointID, StationID, DurationMinutes, TotalKWh, MeterStart,
        DATEADD(MINUTE, Minu, DATEADD(HOUR, Hr, DATEADD(DAY, DayIdx, CAST(CAST(@StartDate AS DATE) AS DATETIME2)))) AS StartTime,
@@ -546,11 +530,6 @@ SET PolicyID = CASE
         WHEN Seq % 25 = 0 THEN N'Failed'
         ELSE N'Completed' END;
 
--- Phien dang sac: chon 250 phien co StartTime gan @EndDate nhat (cho man hinh "dang sac" / active sessions)
-;WITH Recent AS (SELECT TOP (250) Seq FROM #SessionSeed ORDER BY StartTime DESC)
-UPDATE ss SET ss.SessionStatus = N'Charging'
-FROM #SessionSeed ss JOIN Recent r ON r.Seq = ss.Seq;
-
 UPDATE #SessionSeed
 SET CostBeforeTax = Operations.fn_CalculateChargingCost(TotalKWh, PolicyID, StartTime)
 WHERE SessionStatus IN (N'Completed', N'Failed', N'EmergencyStopped');
@@ -568,7 +547,8 @@ SELECT N'BKG-' + RIGHT(N'00000000' + CAST(Seq AS NVARCHAR(10)), 8),
        CASE WHEN SessionStatus = N'Completed' THEN N'Completed' ELSE N'Expired' END,
        DATEADD(DAY, -1, StartTime), DATEADD(MINUTE, DurationMinutes, StartTime)
 FROM #SessionSeed
-WHERE Seq % 3 = 0 AND SessionStatus <> N'Charging';
+WHERE ABS(CHECKSUM(Seq, PointID, UserID)) % 3 = 0
+  AND SessionStatus <> N'Charging';
 
 -- Charging sessions
 INSERT INTO Operations.ChargingSession
@@ -622,6 +602,40 @@ SELECT N'INV-' + RIGHT(N'00000000' + CAST(ss.Seq AS NVARCHAR(10)), 8),
 FROM #SessionSeed ss
 JOIN Operations.ChargingSession cs ON cs.SessionCode = N'SES-' + RIGHT(N'00000000' + CAST(ss.Seq AS NVARCHAR(10)), 8)
 JOIN Payments.PaymentTransaction pt ON pt.SessionID = cs.SessionID;
+
+-- Bao dam tai khoan demo customer01 co lich su hoat dong de man hinh web khong bi trong.
+DECLARE @DemoCustomerID INT = (SELECT UserID FROM [Identity].UserAccount WHERE Username = N'customer01');
+DECLARE @DemoVehicleID INT = (SELECT TOP 1 VehicleID FROM Operations.Vehicle WHERE UserID = @DemoCustomerID ORDER BY VehicleID);
+
+SELECT TOP (260) CAST(cs.SessionID AS BIGINT) AS SessionID, CAST(cs.BookingID AS BIGINT) AS BookingID
+INTO #DemoCustomerSession
+FROM Operations.ChargingSession cs
+WHERE cs.UserID <> @DemoCustomerID
+  AND cs.SessionStatus = N'Completed'
+ORDER BY cs.StartTime DESC;
+
+UPDATE cs
+SET UserID = @DemoCustomerID,
+    VehicleID = @DemoVehicleID
+FROM Operations.ChargingSession cs
+JOIN #DemoCustomerSession ds ON ds.SessionID = cs.SessionID;
+
+UPDATE b
+SET UserID = @DemoCustomerID,
+    VehicleID = @DemoVehicleID
+FROM Operations.Booking b
+JOIN #DemoCustomerSession ds ON ds.BookingID = b.BookingID
+WHERE ds.BookingID IS NOT NULL;
+
+UPDATE pt
+SET UserID = @DemoCustomerID
+FROM Payments.PaymentTransaction pt
+JOIN #DemoCustomerSession ds ON ds.SessionID = pt.SessionID;
+
+UPDATE i
+SET UserID = @DemoCustomerID
+FROM Payments.Invoice i
+JOIN #DemoCustomerSession ds ON ds.SessionID = i.SessionID;
 
 /* ============================================================
    11) TELEMETRY (~@TelemetryRows)
@@ -685,12 +699,6 @@ ENABLE TRIGGER ALL ON Operations.ChargingSession;
 ENABLE TRIGGER ALL ON Payments.PaymentTransaction;
 ENABLE TRIGGER ALL ON Maintenance.MaintenanceTicket;
 
--- Diem dang co phien Charging -> PointStatus = Charging
-UPDATE cp SET cp.PointStatus = N'Charging', cp.UpdatedAt = SYSDATETIME()
-FROM Infrastructure.ChargingPoint cp
-WHERE cp.PointStatus = N'Available'
-  AND EXISTS (SELECT 1 FROM Operations.ChargingSession cs WHERE cs.PointID = cp.PointID AND cs.SessionStatus = N'Charging');
-
 /* ============================================================
    14) SETTLEMENT theo thang (qua stored procedure)
    ============================================================ */
@@ -729,8 +737,9 @@ DROP TABLE #Customers;
 DROP TABLE #Points;
 DROP TABLE #RegionPointCount;
 DROP TABLE #SessionSeed;
+DROP TABLE #DemoCustomerSession;
 DROP TABLE #TelemetryNums;
 DROP TABLE #ErrorNums;
 
-PRINT N'09 - Realistic VN two-year seed created: ~40 regions, ~155 stations, ~850 points, 500 customers, ~300k sessions, telemetry, maintenance, payments, invoices, settlements.';
+PRINT N'09 - Realistic VN two-year seed created: 25 stations, high-density charging points, 500 customers, ~300k ended sessions, telemetry, maintenance, payments, invoices, settlements.';
 GO

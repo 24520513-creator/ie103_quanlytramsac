@@ -813,6 +813,16 @@ BEGIN
         IF @PolicyID IS NULL
             THROW 52004, 'No active pricing policy.', 1;
 
+        IF @MeterStart IS NULL
+        BEGIN
+            SELECT @MeterStart = MAX(MeterEnd)
+            FROM Operations.ChargingSession
+            WHERE PointID = @PointID
+              AND MeterEnd IS NOT NULL;
+
+            SET @MeterStart = ISNULL(@MeterStart, 100000.0000);
+        END;
+
         DECLARE @SessionID BIGINT;
         INSERT INTO Operations.ChargingSession
             (SessionCode, UserID, VehicleID, StationID, PointID, PolicyID, BookingID, MeterStart, SessionStatus)
@@ -858,7 +868,7 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        DECLARE @PointID INT, @PolicyID INT, @StartTime DATETIME2, @MeterStart DECIMAL(14,4), @Status NVARCHAR(30);
+        DECLARE @PointID INT, @PolicyID INT, @StartTime DATETIME2, @MeterStart DECIMAL(14,4), @Status NVARCHAR(30), @PointPowerKW DECIMAL(8,2);
         SELECT @PointID = PointID, @PolicyID = PolicyID, @StartTime = StartTime, @MeterStart = MeterStart, @Status = SessionStatus
         FROM Operations.ChargingSession
         WHERE SessionID = @SessionID;
@@ -876,10 +886,27 @@ BEGIN
         IF @Status <> N'Charging'
             THROW 52011, 'Charging session is not in Charging status.', 1;
 
+        SELECT @PointPowerKW = PowerKW
+        FROM Infrastructure.ChargingPoint
+        WHERE PointID = @PointID;
+
         IF @TotalKWh IS NULL AND @MeterEnd IS NOT NULL AND @MeterStart IS NOT NULL
             SET @TotalKWh = @MeterEnd - @MeterStart;
-        IF @TotalKWh IS NULL OR @TotalKWh <= 0
-            THROW 52012, 'Total kWh must be positive.', 1;
+
+        IF @TotalKWh IS NULL
+        BEGIN
+            DECLARE @ElapsedSeconds INT = DATEDIFF(SECOND, @StartTime, SYSDATETIME());
+            DECLARE @EffectiveSeconds INT = CASE WHEN @ElapsedSeconds < 60 THEN 60 ELSE @ElapsedSeconds END;
+            DECLARE @Utilization DECIMAL(6,4) = CAST(0.38 + ((ABS(CHECKSUM(@SessionID)) % 33) / 100.0) AS DECIMAL(6,4));
+
+            SET @TotalKWh = ROUND(ISNULL(@PointPowerKW, 22) * (@EffectiveSeconds / 3600.0) * @Utilization, 4);
+        END;
+
+        IF @TotalKWh <= 0
+            SET @TotalKWh = 0.1000;
+
+        IF @MeterEnd IS NULL AND @MeterStart IS NOT NULL
+            SET @MeterEnd = @MeterStart + @TotalKWh;
 
         DECLARE @CostBeforeTax DECIMAL(19,4) = Operations.fn_CalculateChargingCost(@TotalKWh, @PolicyID, @StartTime);
         DECLARE @TaxAmount DECIMAL(19,4) = ROUND(@CostBeforeTax * 0.08, 4);
@@ -888,7 +915,7 @@ BEGIN
         SET EndTime = SYSDATETIME(),
             MeterEnd = @MeterEnd,
             TotalKWh = @TotalKWh,
-            DurationMinutes = DATEDIFF(MINUTE, @StartTime, SYSDATETIME()),
+            DurationMinutes = CASE WHEN DATEDIFF(MINUTE, @StartTime, SYSDATETIME()) < 1 THEN 1 ELSE DATEDIFF(MINUTE, @StartTime, SYSDATETIME()) END,
             CostBeforeTax = @CostBeforeTax,
             TaxAmount = @TaxAmount,
             CostTotal = @CostBeforeTax + @TaxAmount,

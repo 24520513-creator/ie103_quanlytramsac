@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useActionData } from '../lib/useAction';
 import { runAction, downloadReportPdf, downloadCsv } from '../lib/api';
 import { formatValue, formatNumber, isStatusColumn } from '../lib/format';
@@ -9,30 +9,92 @@ import { BoltIcon, TrendingUpIcon, ActivityIcon, CheckIcon, DownloadIcon } from 
 
 const STAT_ICONS = [<BoltIcon size={18} />, <TrendingUpIcon size={18} />, <CheckIcon size={18} />, <ActivityIcon size={18} />];
 const ACCENTS = ['brand', 'info', 'warn', 'bad'];
+const RANGE_OPTIONS = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'today', label: 'Hôm nay', days: 0 },
+  { value: '3d', label: '3 ngày', days: 2 },
+  { value: '7d', label: '1 tuần', days: 6 },
+  { value: '1m', label: '1 tháng', months: 1 },
+  { value: '3m', label: '3 tháng', months: 3 },
+  { value: '6m', label: '6 tháng', months: 6 },
+  { value: '1y', label: '1 năm', years: 1 },
+  { value: '2y', label: '2 năm', years: 2 },
+  { value: 'custom', label: 'Tùy chỉnh' }
+];
+
+function toIsoDate(date) {
+  const copy = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return copy.toISOString().slice(0, 10);
+}
+
+function rangeFromPreset(value) {
+  if (value === 'all') return {};
+  const preset = RANGE_OPTIONS.find((item) => item.value === value);
+  if (!preset || value === 'custom') return null;
+  const end = new Date();
+  const start = new Date(end);
+  if (preset.days != null) start.setDate(end.getDate() - preset.days);
+  if (preset.months) start.setMonth(end.getMonth() - preset.months);
+  if (preset.years) start.setFullYear(end.getFullYear() - preset.years);
+  return { FromDate: toIsoDate(start), ToDate: toIsoDate(end) };
+}
+
+function DateRangeControls({ value, onChange, compact = false }) {
+  const [preset, setPreset] = useState('all');
+
+  function applyPreset(nextPreset) {
+    setPreset(nextPreset);
+    const nextRange = rangeFromPreset(nextPreset);
+    if (nextRange) onChange(nextRange);
+    if (nextPreset === 'all') onChange({});
+  }
+
+  function updateCustom(key, nextValue) {
+    setPreset('custom');
+    onChange({ ...value, [key]: nextValue || undefined });
+  }
+
+  return (
+    <div className={`date-range-controls${compact ? ' date-range-controls-compact' : ''}`}>
+      <select value={preset} onChange={(event) => applyPreset(event.target.value)} aria-label="Khoảng thời gian">
+        {RANGE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+      </select>
+      <input type="date" value={value.FromDate || ''} onChange={(event) => updateCustom('FromDate', event.target.value)} aria-label="Từ ngày" />
+      <input type="date" value={value.ToDate || ''} onChange={(event) => updateCustom('ToDate', event.target.value)} aria-label="Đến ngày" />
+    </div>
+  );
+}
 
 /** Renders KPI tiles from a dashboard action returning ChiSo/GiaTri/DonVi rows. */
 export function DashboardStats({ actionId, token, accents }) {
-  const { rows, loading } = useActionData(actionId, { token });
+  const [range, setRange] = useState({});
+  const requestBody = useMemo(() => ({ ...range }), [range]);
+  const { rows, loading } = useActionData(actionId, { token, body: requestBody });
   if (loading) return <Loader />;
   if (!rows.length) return <EmptyState title="Chưa có số liệu" message="Dữ liệu tổng quan sẽ hiển thị tại đây." />;
   return (
-    <div className="ui-grid ui-grid-stats">
-      {rows.map((row, i) => {
-        const keys = Object.keys(row);
-        const label = row.ChiSo ?? row[keys[0]];
-        const value = row.GiaTri ?? row[keys[1]];
-        const unit = row.DonVi ?? row[keys[2]] ?? '';
-        return (
-          <StatTile
-            key={i}
-            icon={STAT_ICONS[i % STAT_ICONS.length]}
-            label={label}
-            value={formatValue(value)}
-            unit={unit}
-            accent={(accents && accents[i]) || ACCENTS[i % ACCENTS.length]}
-          />
-        );
-      })}
+    <div className="ui-stack">
+      <div className="ui-toolbar date-range-toolbar">
+        <DateRangeControls value={range} onChange={setRange} compact />
+      </div>
+      <div className="ui-grid ui-grid-stats">
+        {rows.map((row, i) => {
+          const keys = Object.keys(row);
+          const label = row.ChiSo ?? row[keys[0]];
+          const value = row.GiaTri ?? row[keys[1]];
+          const unit = row.DonVi ?? row[keys[2]] ?? '';
+          return (
+            <StatTile
+              key={i}
+              icon={STAT_ICONS[i % STAT_ICONS.length]}
+              label={label}
+              value={formatValue(value)}
+              unit={unit}
+              accent={(accents && accents[i]) || ACCENTS[i % ACCENTS.length]}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -122,7 +184,8 @@ export function ConfirmAction({ action, open, onClose, params, token, onToast, o
  * `chart` is a render function (rows) => ReactNode.
  */
 export function ReportView({ action, token, chart, columns, body = {} }) {
-  const requestBody = { ...body, pageSize: action.pageSize || body.pageSize || 50 };
+  const [range, setRange] = useState({});
+  const requestBody = useMemo(() => ({ ...body, ...range, pageSize: action.pageSize || body.pageSize || 50 }), [action.pageSize, body, range]);
   const { data, rows, loading, error } = useActionData(action.id, { token, body: requestBody });
   const [exporting, setExporting] = useState(false);
 
@@ -143,9 +206,12 @@ export function ReportView({ action, token, chart, columns, body = {} }) {
   return (
     <div className="ui-stack">
       {action.report || action.exportable ? (
-        <div className="ui-toolbar" style={{ justifyContent: 'flex-end' }}>
-          {action.exportable && <Button variant="ghost" icon={<DownloadIcon size={16} />} disabled={exporting} onClick={() => exportFile('csv')}>Tải CSV</Button>}
-          {action.report && <Button variant="secondary" icon={<DownloadIcon size={16} />} disabled={exporting} onClick={() => exportFile('pdf')}>Tải PDF</Button>}
+        <div className="ui-toolbar date-range-toolbar">
+          <DateRangeControls value={range} onChange={setRange} />
+          <div className="ui-toolbar" style={{ justifyContent: 'flex-end' }}>
+            {action.exportable && <Button variant="ghost" icon={<DownloadIcon size={16} />} disabled={exporting} onClick={() => exportFile('csv')}>Tải CSV</Button>}
+            {action.report && <Button variant="secondary" icon={<DownloadIcon size={16} />} disabled={exporting} onClick={() => exportFile('pdf')}>Tải PDF</Button>}
+          </div>
         </div>
       ) : null}
       {loading ? <Loader /> : error ? <EmptyState title="Không tải được dữ liệu" message={error} /> : (
@@ -170,12 +236,13 @@ export function ReportView({ action, token, chart, columns, body = {} }) {
 export function QuickReports({ h, reports = [], token, onToast, title = 'Xuất báo cáo nhanh', subtitle = 'Tải nhanh PDF hoặc CSV' }) {
   const list = reports.filter((r) => r && (!h || h.has(r.id)));
   const [busy, setBusy] = useState('');
+  const [range, setRange] = useState({});
 
   async function download(report, kind) {
     setBusy(`${report.id}:${kind}`);
     try {
-      if (kind === 'pdf') await downloadReportPdf(report.id, {}, token);
-      else await downloadCsv(report.id, {}, token);
+      if (kind === 'pdf') await downloadReportPdf(report.id, range, token);
+      else await downloadCsv(report.id, range, token);
     } catch (err) {
       onToast?.(friendlyError(err), 'error');
     } finally {
@@ -187,6 +254,9 @@ export function QuickReports({ h, reports = [], token, onToast, title = 'Xuất 
   return (
     <Card>
       <CardHeader title={title} subtitle={subtitle} />
+      <div className="quick-report-range">
+        <DateRangeControls value={range} onChange={setRange} compact />
+      </div>
       <div className="quick-reports">
         {list.map((r) => (
           <div className="quick-report" key={r.id}>

@@ -43,13 +43,26 @@ function bindInputs(request, action, body, user) {
   }
 }
 
-function buildSearchClause(action, body, request) {
-  const search = String(body.search || '').trim();
-  if (!search || !action.searchColumns?.length) return '';
+function buildFilterClause(action, body, request) {
+  const predicates = [];
 
-  request.input('Search', sql.NVarChar(200), `%${search}%`);
-  const predicates = action.searchColumns.map((column) => `CONVERT(NVARCHAR(4000), data.[${column}]) LIKE @Search`);
-  return `WHERE ${predicates.join(' OR ')}`;
+  const search = String(body.search || '').trim();
+  if (search && action.searchColumns?.length) {
+    request.input('Search', sql.NVarChar(200), `%${search}%`);
+    predicates.push(`(${action.searchColumns.map((column) => `CONVERT(NVARCHAR(4000), data.[${column}]) LIKE @Search`).join(' OR ')})`);
+  }
+
+  if (action.dateFilter?.column) {
+    const fromDate = body.FromDate || null;
+    const toDate = body.ToDate || null;
+    request.input('FilterFromDate', sql.Date, fromDate);
+    request.input('FilterToDate', sql.Date, toDate);
+    const column = `data.[${action.dateFilter.column}]`;
+    predicates.push(`(@FilterFromDate IS NULL OR ${column} >= @FilterFromDate)`);
+    predicates.push(`(@FilterToDate IS NULL OR ${column} < DATEADD(DAY, 1, @FilterToDate))`);
+  }
+
+  return predicates.length ? `WHERE ${predicates.join(' AND ')}` : '';
 }
 
 function buildPagedQuery(action, body, request) {
@@ -59,20 +72,20 @@ function buildPagedQuery(action, body, request) {
   request.input('Offset', sql.Int, offset);
   request.input('PageSize', sql.Int, pageSize);
 
-  const searchClause = buildSearchClause(action, body, request);
+  const filterClause = buildFilterClause(action, body, request);
   const orderBy = action.orderBy || '1';
   const baseSql = action.sql.trim().replace(/;+\s*$/g, '');
 
   return `
     SELECT *
     FROM (${baseSql}) AS data
-    ${searchClause}
+    ${filterClause}
     ORDER BY ${orderBy}
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
 
     SELECT COUNT(1) AS TotalRows
     FROM (${baseSql}) AS data
-    ${searchClause};
+    ${filterClause};
   `;
 }
 

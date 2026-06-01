@@ -8,6 +8,9 @@
     - EXECUTE grant for db_ev_business_manager
 */
 
+USE EV_Charging_System;
+GO
+
 CREATE OR ALTER PROCEDURE AppView.sp_ActivatePricingPolicy
     @PolicyID INT
 AS

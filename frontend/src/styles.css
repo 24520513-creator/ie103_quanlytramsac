@@ -1146,6 +1146,13 @@ tbody tr:last-child td { border-bottom: none; }
 
 /* Toolbar row */
 .ui-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.date-range-toolbar { justify-content: space-between; }
+.date-range-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.date-range-controls select,
+.date-range-controls input { min-height: 38px; max-width: 150px; }
+.date-range-controls-compact select,
+.date-range-controls-compact input { min-height: 34px; max-width: 138px; }
+.quick-report-range { margin-bottom: 12px; }
 
 /* Section stack */
 .ui-stack { display: flex; flex-direction: column; gap: 22px; animation: fadeIn 0.3s var(--ease); }

@@ -27,6 +27,11 @@ const statusOptions = {
   paymentMethod: ['CASH', 'QR', 'BANK_TRANSFER']
 };
 
+const dateRangeParams = [
+  { name: 'FromDate', label: 'Từ ngày', type: 'date' },
+  { name: 'ToDate', label: 'Đến ngày', type: 'date' }
+];
+
 function queryAction(base) {
   return {
     kind: 'query',
@@ -59,18 +64,29 @@ export const actions = {
     description: 'Xe, đặt lịch, phiên sạc và hóa đơn gần nhất của khách hàng hiện tại.',
     group: 'dashboard',
     roles: ['Customer'],
+    params: dateRangeParams,
     sql: `
       SELECT N'Xe đang hoạt động' AS ChiSo, COUNT(*) AS GiaTri, N'phương tiện' AS DonVi
-      FROM AppView.vw_MyVehicles WHERE IsActive = 1
+      FROM AppView.vw_MyVehicles
+      WHERE IsActive = 1
+        AND (@FromDate IS NULL OR CreatedAt >= @FromDate)
+        AND (@ToDate IS NULL OR CreatedAt < DATEADD(DAY, 1, @ToDate))
       UNION ALL
-      SELECT N'Đặt lịch gần nhất', COUNT(*), N'lượt'
-      FROM AppView.vw_CustomerBookingHistory WHERE CreatedAt >= DATEADD(DAY, -30, SYSDATETIME())
+      SELECT N'Đặt lịch', COUNT(*), N'lượt'
+      FROM AppView.vw_CustomerBookingHistory
+      WHERE (@FromDate IS NULL OR CreatedAt >= @FromDate)
+        AND (@ToDate IS NULL OR CreatedAt < DATEADD(DAY, 1, @ToDate))
       UNION ALL
       SELECT N'Phiên sạc hoàn tất', COUNT(*), N'phiên'
-      FROM AppView.vw_CustomerChargingHistory WHERE SessionStatus = N'Completed'
+      FROM AppView.vw_CustomerChargingHistory
+      WHERE SessionStatus = N'Completed'
+        AND (@FromDate IS NULL OR StartTime >= @FromDate)
+        AND (@ToDate IS NULL OR StartTime < DATEADD(DAY, 1, @ToDate))
       UNION ALL
       SELECT N'Tổng tiền hóa đơn', COALESCE(SUM(TotalAmount), 0), N'VND'
       FROM AppView.vw_InvoiceDetail
+      WHERE (@FromDate IS NULL OR IssuedAt >= @FromDate)
+        AND (@ToDate IS NULL OR IssuedAt < DATEADD(DAY, 1, @ToDate))
     `,
     orderBy: 'ChiSo',
     searchColumns: ['ChiSo']
@@ -178,6 +194,7 @@ export const actions = {
     sql: 'SELECT * FROM AppView.vw_CustomerChargingHistory',
     orderBy: 'StartTime DESC, SessionID DESC',
     searchColumns: ['SessionCode', 'PlateNumber', 'StationCode', 'StationName', 'PointCode', 'SessionStatus'],
+    dateFilter: { column: 'StartTime' },
     report: true,
     columns: ['SessionID', 'SessionCode', 'PlateNumber', 'StationName', 'PointCode', 'StartTime', 'EndTime', 'TotalKWh', 'CostTotal', 'SessionStatus']
   }),
@@ -192,7 +209,6 @@ export const actions = {
     params: [
       { name: 'VehicleID', label: 'Xe', type: 'int', lookup: { key: 'customerVehicles' } },
       { name: 'PointID', label: 'Cổng sạc', type: 'int', required: true, lookup: { key: 'customerAvailablePoints' }, lockedWhenInitial: true },
-      { name: 'MeterStart', label: 'Chỉ số đầu', type: 'decimal' },
       { name: 'BookingID', label: 'Đặt chỗ đã có', type: 'bigInt', lookup: { key: 'customerStartableBookings' }, applyMeta: { VehicleID: 'VehicleID', PointID: 'PointID' } }
     ]
   }),
@@ -205,10 +221,7 @@ export const actions = {
     procedure: 'Operations.sp_EndChargingSession',
     confirm: true,
     params: [
-      { name: 'SessionID', label: 'Phiên đang sạc', type: 'bigInt', required: true, lookup: { key: 'customerActiveSessions' }, lockedWhenInitial: true },
-      { name: 'MeterEnd', label: 'Chỉ số cuối', type: 'decimal' },
-      { name: 'TotalKWh', label: 'Tổng kWh', type: 'decimal' },
-      { name: 'StopReason', label: 'Lý do dừng', type: 'nvarchar', defaultValue: 'Completed' }
+      { name: 'SessionID', label: 'Phiên đang sạc', type: 'bigInt', required: true, lookup: { key: 'customerActiveSessions' }, lockedWhenInitial: true }
     ]
   }),
 
@@ -244,6 +257,7 @@ export const actions = {
     sql: 'SELECT * FROM AppView.vw_InvoiceDetail',
     orderBy: 'IssuedAt DESC, InvoiceID DESC',
     searchColumns: ['InvoiceCode', 'TransactionCode', 'StationCode', 'StationName', 'InvoiceStatus', 'TransactionStatus'],
+    dateFilter: { column: 'IssuedAt' },
     report: true,
     columns: ['InvoiceID', 'InvoiceCode', 'InvoiceStatus', 'IssuedAt', 'TotalAmount', 'TransactionCode', 'PaymentMethod', 'StationName']
   }),
@@ -253,12 +267,21 @@ export const actions = {
     description: 'Tình trạng trạm, cổng, phiên đang sạc và ticket mở.',
     group: 'dashboard',
     roles: ['OperationsStaff'],
+    params: dateRangeParams,
     sql: `
       SELECT N'Tổng trạm' AS ChiSo, COUNT(*) AS GiaTri, N'trạm' AS DonVi FROM AppView.vw_StationStatusOverview
       UNION ALL SELECT N'Cổng khả dụng', SUM(AvailablePoints), N'cổng' FROM AppView.vw_StationStatusOverview
       UNION ALL SELECT N'Cổng lỗi', SUM(ProblemPoints), N'cổng' FROM AppView.vw_StationStatusOverview
-      UNION ALL SELECT N'Phiên đang sạc', COUNT(*), N'phiên' FROM AppView.vw_ActiveChargingSessions
-      UNION ALL SELECT N'Ticket mở', COUNT(*), N'ticket' FROM AppView.vw_MaintenanceTickets WHERE TicketStatus IN (N'Open', N'Assigned', N'InProgress')
+      UNION ALL SELECT N'Phiên hoàn tất', COUNT(*), N'phiên'
+      FROM Operations.ChargingSession
+      WHERE SessionStatus = N'Completed'
+        AND (@FromDate IS NULL OR StartTime >= @FromDate)
+        AND (@ToDate IS NULL OR StartTime < DATEADD(DAY, 1, @ToDate))
+      UNION ALL SELECT N'Ticket mở', COUNT(*), N'ticket'
+      FROM AppView.vw_MaintenanceTickets
+      WHERE TicketStatus IN (N'Open', N'Assigned', N'InProgress')
+        AND (@FromDate IS NULL OR OpenedAt >= @FromDate)
+        AND (@ToDate IS NULL OR OpenedAt < DATEADD(DAY, 1, @ToDate))
     `,
     orderBy: 'ChiSo',
     searchColumns: ['ChiSo']
@@ -272,6 +295,7 @@ export const actions = {
     sql: 'SELECT * FROM AppView.vw_StationStatusOverview',
     orderBy: 'StationCode',
     searchColumns: ['StationCode', 'StationName', 'StationStatus'],
+    dateFilter: { column: 'LastStatusChangeAt' },
     report: true,
     columns: ['StationID', 'StationCode', 'StationName', 'StationStatus', 'TotalPoints', 'AvailablePoints', 'ChargingPoints', 'ProblemPoints']
   }),
@@ -354,6 +378,7 @@ export const actions = {
     sql: 'SELECT * FROM AppView.vw_MaintenanceTickets',
     orderBy: 'OpenedAt DESC, TicketID DESC',
     searchColumns: ['TicketCode', 'Priority', 'TicketStatus', 'Title', 'StationCode', 'PointCode', 'AssignedToUsername'],
+    dateFilter: { column: 'OpenedAt' },
     report: true,
     columns: ['TicketID', 'TicketCode', 'Priority', 'TicketStatus', 'Title', 'StationCode', 'PointCode', 'AssignedToFullName', 'OpenedAt']
   }),
@@ -415,11 +440,27 @@ export const actions = {
     description: 'Doanh thu, phiên hoàn tất, tăng trưởng khách hàng và settlement.',
     group: 'dashboard',
     roles: ['BusinessManager'],
+    params: dateRangeParams,
     sql: `
-      SELECT N'Doanh thu thanh toán' AS ChiSo, COALESCE(SUM(TotalAmount), 0) AS GiaTri, N'VND' AS DonVi FROM AppView.vw_PaymentSummary
-      UNION ALL SELECT N'Phiên hoàn tất', COALESCE(SUM(CompletedSessions), 0), N'phiên' FROM AppView.vw_SystemOperationalKPI
-      UNION ALL SELECT N'Khách hàng mới', COALESCE(SUM(NewCustomers), 0), N'tài khoản' FROM AppView.vw_CustomerGrowth
-      UNION ALL SELECT N'Top trạm có doanh thu', COUNT(*), N'trạm' FROM AppView.vw_TopRevenueStations
+      SELECT N'Doanh thu thanh toán' AS ChiSo, COALESCE(SUM(RevenueTotal), 0) AS GiaTri, N'VND' AS DonVi
+      FROM AppView.vw_ChargingSessionStatistics
+      WHERE SessionStatus = N'Completed'
+        AND (@FromDate IS NULL OR SessionDate >= @FromDate)
+        AND (@ToDate IS NULL OR SessionDate < DATEADD(DAY, 1, @ToDate))
+      UNION ALL SELECT N'Phiên hoàn tất', COALESCE(SUM(SessionCount), 0), N'phiên'
+      FROM AppView.vw_ChargingSessionStatistics
+      WHERE SessionStatus = N'Completed'
+        AND (@FromDate IS NULL OR SessionDate >= @FromDate)
+        AND (@ToDate IS NULL OR SessionDate < DATEADD(DAY, 1, @ToDate))
+      UNION ALL SELECT N'Khách hàng mới', COALESCE(SUM(NewCustomers), 0), N'tài khoản'
+      FROM AppView.vw_CustomerGrowth
+      WHERE (@FromDate IS NULL OR DATEFROMPARTS(CreatedYear, CreatedMonth, 1) >= @FromDate)
+        AND (@ToDate IS NULL OR DATEFROMPARTS(CreatedYear, CreatedMonth, 1) < DATEADD(DAY, 1, @ToDate))
+      UNION ALL SELECT N'Trạm có doanh thu', COUNT(DISTINCT StationID), N'trạm'
+      FROM AppView.vw_StationRevenueDaily
+      WHERE RevenueTotal > 0
+        AND (@FromDate IS NULL OR RevenueDate >= @FromDate)
+        AND (@ToDate IS NULL OR RevenueDate < DATEADD(DAY, 1, @ToDate))
     `,
     orderBy: 'ChiSo',
     searchColumns: ['ChiSo']
@@ -572,6 +613,7 @@ export const actions = {
     sql: 'SELECT * FROM AppView.vw_ChargingSessionStatistics',
     orderBy: 'SessionStatus',
     searchColumns: ['SessionStatus'],
+    dateFilter: { column: 'SessionDate' },
     report: true
   }),
 
@@ -595,6 +637,7 @@ export const actions = {
     sql: 'SELECT * FROM AppView.vw_StationRevenueDaily',
     orderBy: 'RevenueDate DESC, RevenueTotal DESC',
     searchColumns: ['StationCode', 'StationName', 'FranchiseCode', 'FranchiseName'],
+    dateFilter: { column: 'RevenueDate' },
     report: true,
     columns: ['RevenueDate', 'StationCode', 'StationName', 'CompletedSessions', 'TotalKWh', 'RevenueTotal']
   }),
@@ -631,6 +674,7 @@ export const actions = {
     sql: 'SELECT * FROM AppView.vw_ErrorLogActive',
     orderBy: 'OccurredAt DESC, ErrorID DESC',
     searchColumns: ['ErrorCode', 'Severity', 'StationCode', 'PointCode', 'Description'],
+    dateFilter: { column: 'OccurredAt' },
     report: true,
     columns: ['ErrorCode', 'Severity', 'StationCode', 'PointCode', 'OccurredAt', 'Description']
   }),
@@ -726,11 +770,15 @@ export const actions = {
     description: 'Hồ sơ franchise, trạm, hợp đồng và settlement gần nhất.',
     group: 'dashboard',
     roles: ['FranchisePartner'],
+    params: dateRangeParams,
     sql: `
       SELECT N'Trạm thuộc franchise' AS ChiSo, COUNT(*) AS GiaTri, N'trạm' AS DonVi FROM AppView.vw_MyFranchiseStations
       UNION ALL SELECT N'Hợp đồng', COUNT(*), N'hợp đồng' FROM AppView.vw_MyFranchiseContracts
       UNION ALL SELECT N'Chính sách đang áp dụng', COUNT(*), N'chính sách' FROM AppView.vw_MyRevenueSharePolicies WHERE IsActive = 1
-      UNION ALL SELECT N'Quyết toán', COUNT(*), N'kỳ' FROM AppView.vw_MyRevenueShareSettlements
+      UNION ALL SELECT N'Quyết toán', COUNT(*), N'kỳ'
+      FROM AppView.vw_MyRevenueShareSettlements
+      WHERE (@FromDate IS NULL OR PeriodEnd >= @FromDate)
+        AND (@ToDate IS NULL OR PeriodStart < DATEADD(DAY, 1, @ToDate))
     `,
     orderBy: 'ChiSo',
     searchColumns: ['ChiSo']
@@ -790,11 +838,18 @@ export const actions = {
     description: 'Tài khoản, role và audit gần nhất.',
     group: 'dashboard',
     roles: ['SystemAdmin'],
+    params: dateRangeParams,
     sql: `
-      SELECT N'Tổng user' AS ChiSo, COUNT(*) AS GiaTri, N'tài khoản' AS DonVi FROM AppView.vw_UserRoleSummary
+      SELECT N'Tổng user' AS ChiSo, COUNT(*) AS GiaTri, N'tài khoản' AS DonVi
+      FROM [Identity].UserAccount
+      WHERE (@FromDate IS NULL OR CreatedAt >= @FromDate)
+        AND (@ToDate IS NULL OR CreatedAt < DATEADD(DAY, 1, @ToDate))
       UNION ALL SELECT N'User bị khóa', COUNT(*), N'tài khoản' FROM AppView.vw_UserRoleSummary WHERE AccountStatus IN (N'Locked', N'Suspended')
       UNION ALL SELECT N'Role đang dùng', COUNT(DISTINCT RoleCodes), N'nhóm' FROM AppView.vw_UserRoleSummary
-      UNION ALL SELECT N'Audit gần nhất', COUNT(*), N'dòng' FROM AppView.vw_AuditLogRecent
+      UNION ALL SELECT N'Audit gần nhất', COUNT(*), N'dòng'
+      FROM AppView.vw_AuditLogRecent
+      WHERE (@FromDate IS NULL OR ChangedAt >= @FromDate)
+        AND (@ToDate IS NULL OR ChangedAt < DATEADD(DAY, 1, @ToDate))
     `,
     orderBy: 'ChiSo',
     searchColumns: ['ChiSo']
@@ -897,6 +952,7 @@ export const actions = {
     sql: 'SELECT * FROM AppView.vw_AuditLogRecent',
     orderBy: 'ChangedAt DESC, AuditID DESC',
     searchColumns: ['SchemaName', 'TableName', 'RecordID', 'ActionType', 'ChangedBy'],
+    dateFilter: { column: 'ChangedAt' },
     report: true,
     columns: ['AuditID', 'SchemaName', 'TableName', 'RecordID', 'ActionType', 'ChangedBy', 'ChangedAt']
   }),
