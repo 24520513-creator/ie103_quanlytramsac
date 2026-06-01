@@ -991,7 +991,7 @@ export const actions = {
     rows: [
       {
         Muc: 'Backup',
-        HuongDan: 'Thực hiện bằng SSMS hoặc script database/10_Backup_Restore.sql trên máy quản trị SQL Server.'
+        HuongDan: 'Thực hiện bằng SSMS hoặc script database/12_Backup_Restore.sql trên máy quản trị SQL Server.'
       },
       {
         Muc: 'Restore',
