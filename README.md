@@ -29,6 +29,12 @@ database/06_Create_Triggers.sql
 database/07_Create_AppViews.sql
 database/08_Create_Security.sql
 database/09_Seed_Demo_Data.sql
+database/BonusSQL/01_Web_Lookups_Customer.sql
+database/BonusSQL/02_Web_Lookups_Operations.sql
+database/BonusSQL/03_Web_Lookups_Business_Admin.sql
+database/BonusSQL/04_Web_PricingPolicy_Actions.sql
+database/BonusSQL/05_Web_Reports.sql
+database/features/security/08_sql_authentication_logins.sql
 ```
 
 Script bổ sung:

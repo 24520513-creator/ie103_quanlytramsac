@@ -22,9 +22,11 @@ function aggregateSum(rows, nameKey, valKey) {
 
 /* ------------------------------- Dashboard ------------------------------- */
 export function BizDashboard({ ctx, h }) {
-  const region = useActionData('regionRevenue', { token: ctx.token, body: { pageSize: 20 } });
-  const growth = useActionData('customerGrowth', { token: ctx.token, body: { pageSize: 24 } });
-  const sessions = useActionData('sessionStatistics', { token: ctx.token, body: { pageSize: 100 } });
+  const [dashboardRange, setDashboardRange] = useState({});
+  const dashboardBody = useMemo(() => ({ ...dashboardRange }), [dashboardRange]);
+  const region = useActionData('regionRevenue', { token: ctx.token, body: { ...dashboardBody, pageSize: 20 } });
+  const growth = useActionData('customerGrowth', { token: ctx.token, body: { ...dashboardBody, pageSize: 24 } });
+  const sessions = useActionData('sessionStatistics', { token: ctx.token, body: { ...dashboardBody, pageSize: 100 } });
 
   const growthData = growth.rows.map((r) => ({ label: `${r.CreatedMonth}/${r.CreatedYear}`, NewCustomers: Number(r.NewCustomers) || 0 })).reverse();
   const sessionData = aggregateSum(sessions.rows, 'SessionStatus', 'SessionCount');
@@ -32,7 +34,7 @@ export function BizDashboard({ ctx, h }) {
   return (
     <div className="ui-stack">
       <PageHeader icon={<BusinessIcon size={22} />} title="Tổng quan kinh doanh" subtitle="Doanh thu, tăng trưởng khách hàng và hiệu suất phiên sạc." />
-      <DashboardStats actionId="businessDashboard" token={ctx.token} accents={['brand', 'info', 'warn', 'brand']} />
+      <DashboardStats actionId="businessDashboard" token={ctx.token} accents={['brand', 'info', 'warn', 'brand']} onRangeChange={setDashboardRange} />
       <div className="ui-grid ui-grid-2">
         <Card>
           <CardHeader title="Doanh thu theo khu vực" subtitle="VND" />
@@ -66,7 +68,7 @@ const REPORTS = [
   { id: 'stationRevenueByYear', label: 'Doanh thu theo năm', chart: (rows) => <Bars data={aggregateSum(rows, 'RevenueYear', 'RevenueTotal').map((r) => ({ RevenueYear: r.name, RevenueTotal: r.value }))} xKey="RevenueYear" yKeys={['RevenueTotal']} height={300} /> },
   { id: 'regionRevenue', label: 'Theo khu vực', chart: (rows) => <Bars data={rows} xKey="RegionName" yKeys={['RevenueTotal']} height={300} /> },
   { id: 'connectorUtilization', label: 'Theo đầu sạc', chart: (rows) => <Bars data={rows} xKey="ConnectorName" yKeys={['TotalRevenue']} height={300} /> },
-  { id: 'stationRevenueDaily', label: 'Doanh thu theo ngày', chart: null },
+  { id: 'stationRevenueDaily', label: 'Doanh thu theo ngày', chart: null, chartActionId: 'stationRevenueTrend' },
   { id: 'topRevenueStations', label: 'Top trạm', chart: (rows) => <Bars data={rows} xKey="StationName" yKeys={['RevenueTotal']} height={320} horizontal /> },
   { id: 'peakHours', label: 'Giờ cao điểm', chart: (rows) => <Bars data={[...rows].sort((a, b) => a.StartHour - b.StartHour)} xKey="StartHour" yKeys={['SessionCount']} height={300} /> },
   { id: 'customerGrowth', label: 'Tăng trưởng KH', chart: (rows) => <AreaTrend data={rows.map((r) => ({ label: `${r.CreatedMonth}/${r.CreatedYear}`, NewCustomers: Number(r.NewCustomers) || 0 })).reverse()} xKey="label" yKey="NewCustomers" height={300} /> },
@@ -94,7 +96,7 @@ export function ReportsExplorer({ ctx, h }) {
     <div className="ui-stack">
       <PageHeader icon={<ReportIcon size={22} />} title="Báo cáo & phân tích" subtitle="Trực quan hóa dữ liệu kinh doanh và xuất PDF/CSV." />
       <Tabs tabs={available.map((r) => ({ id: r.id, label: r.label }))} active={active} onChange={setActive} />
-      {cfg && <ReportView key={cfg.id} action={h.get(cfg.id)} token={ctx.token} chart={cfg.chart} />}
+      {cfg && <ReportView key={cfg.id} action={h.get(cfg.id)} token={ctx.token} chart={cfg.chart} chartActionId={cfg.chartActionId} />}
     </div>
   );
 }

@@ -1608,6 +1608,7 @@ tbody tr:last-child td { border-bottom: none; }
   z-index: 9999;
   width: 560px;
   max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 20px);
   background: var(--bg-card);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
@@ -1615,7 +1616,9 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 0;
   pointer-events: auto;
   animation: sqTipIn 0.14s var(--ease-out) both;
-  overflow: hidden;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 /* Above placement: tooltip bottom is anchored to button top via inline `bottom` style */
 .sq-placement-above { animation-name: sqTipInUp; }
@@ -1773,7 +1776,7 @@ tbody tr:last-child td { border-bottom: none; }
   margin: 0;
   overflow-y: auto;
   overflow-x: auto;
-  max-height: 260px;
+  max-height: min(260px, 42vh);
   white-space: pre;
   tab-size: 4;
   scrollbar-width: thin;

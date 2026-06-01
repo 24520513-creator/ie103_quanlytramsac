@@ -4,7 +4,7 @@ import { hashPassword } from './auth.js';
 import { normalizeRecordset, sqlTypes, withSession } from './db.js';
 import { validateActionLookups } from './lookups.js';
 
-const maxPageSize = 100;
+const maxPageSize = 5000;
 
 function assertRole(action, user) {
   if (!action.roles.includes(user.roleCode)) {
@@ -89,6 +89,19 @@ function buildPagedQuery(action, body, request) {
   `;
 }
 
+function buildFilteredQuery(action, body, request) {
+  const filterClause = buildFilterClause(action, body, request);
+  const orderBy = action.orderBy || '1';
+  const baseSql = action.sql.trim().replace(/;+\s*$/g, '');
+
+  return `
+    SELECT *
+    FROM (${baseSql}) AS data
+    ${filterClause}
+    ORDER BY ${orderBy};
+  `;
+}
+
 function normalizeResult(result, action, body) {
   const firstSet = result.recordsets?.[0] || result.recordset || [];
   const countSet = result.recordsets?.[1] || [];
@@ -146,8 +159,11 @@ export async function runAction(actionId, user, body = {}) {
     if (action.kind === 'procedure') {
       return request.execute(action.procedure);
     }
-    if (action.paginated) {
+    if (action.paginated || body.page || body.pageSize) {
       return request.query(buildPagedQuery(action, preparedBody, request));
+    }
+    if (action.dateFilter || body.search) {
+      return request.query(buildFilteredQuery(action, preparedBody, request));
     }
     return request.query(action.sql);
   });

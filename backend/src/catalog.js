@@ -642,6 +642,30 @@ export const actions = {
     columns: ['RevenueDate', 'StationCode', 'StationName', 'CompletedSessions', 'TotalKWh', 'RevenueTotal']
   }),
 
+  stationRevenueTrend: queryAction({
+    title: 'Xu huong doanh thu theo thoi gian',
+    description: 'Du lieu tong hop theo ngay cho bieu do doanh thu.',
+    group: 'reports',
+    roles: ['BusinessManager'],
+    sql: `
+      SELECT RevenueDate,
+             SUM(CompletedSessions) AS CompletedSessions,
+             SUM(TotalKWh) AS TotalKWh,
+             SUM(RevenueTotal) AS RevenueTotal
+      FROM AppView.vw_StationRevenueDaily
+      WHERE (@FromDate IS NULL OR RevenueDate >= @FromDate)
+        AND (@ToDate IS NULL OR RevenueDate < DATEADD(DAY, 1, @ToDate))
+      GROUP BY RevenueDate
+    `,
+    orderBy: 'RevenueDate',
+    searchColumns: [],
+    params: [
+      { name: 'FromDate', label: 'Tu ngay', type: 'date' },
+      { name: 'ToDate', label: 'Den ngay', type: 'date' }
+    ],
+    columns: ['RevenueDate', 'CompletedSessions', 'TotalKWh', 'RevenueTotal']
+  }),
+
   connectorUtilization: queryAction({
     title: 'Hiệu suất theo loại đầu sạc',
     description: 'Số cổng, phiên hoàn tất, sản lượng và doanh thu theo loại đầu sạc.',

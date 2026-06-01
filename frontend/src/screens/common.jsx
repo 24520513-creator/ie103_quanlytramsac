@@ -30,6 +30,58 @@ function toIsoDate(date) {
   return copy.toISOString().slice(0, 10);
 }
 
+function parseDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function startOfWeek(date) {
+  const copy = new Date(date);
+  const day = copy.getDay() || 7;
+  copy.setDate(copy.getDate() - day + 1);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function daysBetween(from, to) {
+  if (!from || !to) return null;
+  return Math.max(0, Math.round((to - from) / 86400000));
+}
+
+function bucketForRange(range = {}, rows = [], dateKey) {
+  let from = parseDate(range.FromDate);
+  let to = parseDate(range.ToDate);
+  if ((!from || !to) && rows.length && dateKey) {
+    const dates = rows.map((row) => parseDate(row[dateKey])).filter(Boolean).sort((a, b) => a - b);
+    from = from || dates[0];
+    to = to || dates[dates.length - 1];
+  }
+  const span = daysBetween(from, to);
+  if (span == null) return 'month';
+  if (span <= 31) return 'day';
+  if (span < 180) return 'week';
+  if (span < 730) return 'month';
+  return 'quarter';
+}
+
+function bucketKey(date, bucket) {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  if (bucket === 'day') return { key: toIsoDate(date), label: date.toLocaleDateString('vi-VN'), sort: toIsoDate(date) };
+  if (bucket === 'week') {
+    const start = startOfWeek(date);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { key: toIsoDate(start), label: `${start.toLocaleDateString('vi-VN')} - ${end.toLocaleDateString('vi-VN')}`, sort: toIsoDate(start) };
+  }
+  if (bucket === 'quarter') {
+    const quarter = Math.floor((month - 1) / 3) + 1;
+    return { key: `${year}-Q${quarter}`, label: `Q${quarter}/${year}`, sort: `${year}-${quarter}` };
+  }
+  return { key: `${year}-${String(month).padStart(2, '0')}`, label: `${month}/${year}`, sort: `${year}-${String(month).padStart(2, '0')}` };
+}
+
 function rangeFromPreset(value) {
   if (value === 'all') return {};
   const preset = RANGE_OPTIONS.find((item) => item.value === value);
@@ -66,9 +118,14 @@ function labelByParts(row, parts = []) {
   return values.join(' - ');
 }
 
+function isDateKey(key) {
+  return /date|time|issued|opened|created|period/i.test(String(key || ''));
+}
+
 function chartConfigFor(action, columns = [], rows = []) {
   const byId = {
     stationRevenueDaily: { type: 'line', xKey: 'RevenueDate', yKey: 'RevenueTotal' },
+    stationRevenueTrend: { type: 'line', xKey: 'RevenueDate', yKey: 'RevenueTotal' },
     stationRevenueByYear: { type: 'bar', xKey: 'RevenueYear', yKey: 'RevenueTotal', aggregate: true },
     stationRevenue: { type: 'bar', xKey: 'StationName', yKey: 'RevenueTotal', horizontal: true },
     regionRevenue: { type: 'bar', xKey: 'RegionName', yKey: 'RevenueTotal' },
@@ -105,7 +162,7 @@ function chartConfigFor(action, columns = [], rows = []) {
   return null;
 }
 
-function chartRows(rows, cfg) {
+function chartRows(rows, cfg, range = {}) {
   if (!cfg || !rows.length) return [];
   if (cfg.type === 'kpiBars') {
     const row = rows[0] || {};
@@ -115,18 +172,31 @@ function chartRows(rows, cfg) {
     return rows.map((row) => ({ label: labelByParts(row, cfg.parts), value: num(row[cfg.yKey]) })).reverse();
   }
   if (cfg.type === 'donut') return aggregate(rows, cfg.xKey, cfg.yKey, { countRows: cfg.countRows }).sort((a, b) => b.value - a.value);
+  if (cfg.type === 'line' && cfg.xKey && cfg.yKey && isDateKey(cfg.xKey)) {
+    const bucket = bucketForRange(range, rows, cfg.xKey);
+    const map = new Map();
+    rows.forEach((row) => {
+      const date = parseDate(row[cfg.xKey]);
+      if (!date) return;
+      const b = bucketKey(date, bucket);
+      const current = map.get(b.key) || { label: b.label, sort: b.sort, value: 0 };
+      current.value += num(row[cfg.yKey]);
+      map.set(b.key, current);
+    });
+    return [...map.values()].sort((a, b) => String(a.sort).localeCompare(String(b.sort)));
+  }
   if (cfg.aggregate) return aggregate(rows, cfg.xKey, cfg.yKey).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   return rows.slice(0, cfg.type === 'line' ? 18 : 12);
 }
 
-function ReportChart({ action, rows, columns, customChart }) {
+function ReportChart({ action, rows, columns, customChart, range }) {
   if (customChart && rows.length > 0) return customChart(rows);
   const cfg = chartConfigFor(action, columns, rows);
-  const data = chartRows(rows, cfg);
+  const data = chartRows(rows, cfg, range);
   if (!cfg || data.length === 0) return null;
 
   if (cfg.type === 'line') {
-    if (cfg.parts || cfg.aggregate || cfg.type === 'kpiBars') return <AreaTrend data={data} xKey="label" yKey="value" height={300} />;
+    if (cfg.parts || cfg.aggregate || isDateKey(cfg.xKey) || cfg.type === 'kpiBars') return <AreaTrend data={data} xKey={data[0]?.label !== undefined ? 'label' : 'name'} yKey="value" height={300} />;
     return <AreaTrend data={rows.slice().reverse()} xKey={cfg.xKey} yKey={cfg.yKey} height={300} />;
   }
   if (cfg.type === 'donut') return <Donut data={data} nameKey="name" valueKey="value" height={300} />;
@@ -212,16 +282,20 @@ function DateRangeControls({ value, onChange, compact = false }) {
 }
 
 /** Renders KPI tiles from a dashboard action returning ChiSo/GiaTri/DonVi rows. */
-export function DashboardStats({ actionId, token, accents }) {
+export function DashboardStats({ actionId, token, accents, onRangeChange }) {
   const [range, setRange] = useState({});
   const requestBody = useMemo(() => ({ ...range }), [range]);
   const { rows, loading } = useActionData(actionId, { token, body: requestBody });
+  function changeRange(nextRange) {
+    setRange(nextRange);
+    onRangeChange?.(nextRange);
+  }
   if (loading) return <Loader />;
   if (!rows.length) return <EmptyState title="Chưa có số liệu" message="Dữ liệu tổng quan sẽ hiển thị tại đây." />;
   return (
     <div className="ui-stack">
       <div className="ui-toolbar date-range-toolbar">
-        <DateRangeControls value={range} onChange={setRange} compact />
+        <DateRangeControls value={range} onChange={changeRange} compact />
       </div>
       <div className="ui-grid ui-grid-stats">
         {rows.map((row, i) => {
@@ -329,10 +403,12 @@ export function ConfirmAction({ action, open, onClose, params, token, onToast, o
  * Generic report view: optional chart on top + data table + export buttons.
  * `chart` is a render function (rows) => ReactNode.
  */
-export function ReportView({ action, token, chart, columns, body = {} }) {
+export function ReportView({ action, token, chart, columns, body = {}, chartActionId }) {
   const [range, setRange] = useState({});
   const requestBody = useMemo(() => ({ ...body, ...range, pageSize: action.pageSize || body.pageSize || 50 }), [action.pageSize, body, range]);
   const { data, rows, loading, error } = useActionData(action.id, { token, body: requestBody });
+  const chartRequestBody = useMemo(() => ({ ...body, ...range, pageSize: 5000 }), [body, range]);
+  const chartResult = useActionData(chartActionId || action.id, { token, body: chartRequestBody, auto: Boolean(chartActionId) });
   const [exporting, setExporting] = useState(false);
 
   async function exportFile(kind) {
@@ -348,7 +424,9 @@ export function ReportView({ action, token, chart, columns, body = {} }) {
   }
 
   const cols = (columns?.length ? columns : action.columns?.length ? action.columns : data?.columns) || [];
-  const hasChart = Boolean(chart) || Boolean(chartConfigFor(action, cols, rows));
+  const visualAction = chartActionId ? { ...action, id: chartActionId } : action;
+  const visualRows = chartActionId && !chartResult.error ? chartResult.rows : rows;
+  const hasChart = Boolean(chart) || Boolean(chartConfigFor(visualAction, cols, visualRows));
 
   return (
     <div className="ui-stack">
@@ -367,7 +445,9 @@ export function ReportView({ action, token, chart, columns, body = {} }) {
           {rows.length > 0 && hasChart && (
             <div className="ui-card report-chart-card">
               <CardHeader title="Biểu đồ phân tích" subtitle="Trực quan hóa chỉ số chính trong phạm vi dữ liệu" />
-              <ReportChart action={action} rows={rows} columns={cols} customChart={chart} />
+              {chartActionId && chartResult.loading
+                ? <Loader />
+                : <ReportChart action={visualAction} rows={visualRows} columns={cols} customChart={chart} range={range} />}
             </div>
           )}
           <DataTable

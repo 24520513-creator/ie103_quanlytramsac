@@ -5,6 +5,7 @@ const TOOLTIP_W = 560;
 const GAP = 10;
 const HIDE_DELAY = 180;
 const EDGE = 8; // min distance from viewport edge
+const MIN_PANEL_H = 180;
 
 const OP_CLASS = {
   SELECT: 'sq-op-select',
@@ -45,13 +46,13 @@ function computePos(r) {
     left = r.left - TOOLTIP_W - GAP;
     top  = r.top;
     placement = 'left';
-  } else if (spaceAbove >= spaceBelow) {
+  } else if (spaceAbove >= MIN_PANEL_H && spaceAbove >= spaceBelow) {
     // Anchor: bottom of tooltip = top of trigger - GAP (handled in style below)
-    left = r.left;
+    left = r.left + (r.width / 2) - (TOOLTIP_W / 2);
     top  = r.top - GAP;
     placement = 'above';
   } else {
-    left = r.left;
+    left = r.left + (r.width / 2) - (TOOLTIP_W / 2);
     top  = r.bottom + GAP;
     placement = 'below';
   }
@@ -59,7 +60,19 @@ function computePos(r) {
   // Pre-clamp horizontal (fine-tuned again post-render)
   left = Math.min(Math.max(left, EDGE), window.innerWidth - TOOLTIP_W - EDGE);
 
-  return { top, left, placement };
+  return {
+    top,
+    left,
+    placement,
+    trigger: {
+      top: r.top,
+      right: r.right,
+      bottom: r.bottom,
+      left: r.left,
+      width: r.width,
+      height: r.height
+    }
+  };
 }
 
 /**
@@ -70,8 +83,10 @@ function clampToViewport(tipEl, pos) {
   const r   = tipEl.getBoundingClientRect();
   const vw  = window.innerWidth;
   const vh  = window.innerHeight;
+  const trigger = pos.trigger;
 
-  let { top, left } = pos;
+  let { top, left, placement } = pos;
+  let maxHeight = pos.maxHeight || null;
   let changed = false;
 
   // ── Horizontal ──────────────────────────────────────────────────────────
@@ -79,9 +94,34 @@ function clampToViewport(tipEl, pos) {
   if (r.left  < EDGE)        { left = EDGE;                changed = true; }
 
   // ── Vertical (only for non-above placements that use `top`) ────────────
-  if (pos.placement !== 'above') {
+  if (trigger && placement === 'below') {
+    const availableBelow = vh - trigger.bottom - GAP - EDGE;
+    const availableAbove = trigger.top - GAP - EDGE;
+    if (availableBelow < Math.min(r.height, MIN_PANEL_H) && availableAbove > availableBelow) {
+      placement = 'above';
+      top = trigger.top - GAP;
+      maxHeight = Math.max(MIN_PANEL_H, availableAbove);
+    } else {
+      top = trigger.bottom + GAP;
+      maxHeight = Math.max(MIN_PANEL_H, availableBelow);
+    }
+    changed = true;
+  } else if (trigger && placement === 'above') {
+    const availableAbove = trigger.top - GAP - EDGE;
+    const availableBelow = vh - trigger.bottom - GAP - EDGE;
+    if (availableAbove < Math.min(r.height, MIN_PANEL_H) && availableBelow > availableAbove) {
+      placement = 'below';
+      top = trigger.bottom + GAP;
+      maxHeight = Math.max(MIN_PANEL_H, availableBelow);
+    } else {
+      top = trigger.top - GAP;
+      maxHeight = Math.max(MIN_PANEL_H, availableAbove);
+    }
+    changed = true;
+  } else if (pos.placement !== 'above') {
     if (r.bottom > vh - EDGE) { top = vh - r.height - EDGE; changed = true; }
     if (r.top    < EDGE)       { top = EDGE;                 changed = true; }
+    maxHeight = Math.max(MIN_PANEL_H, vh - EDGE * 2);
   } else {
     // 'above' uses CSS `bottom` — check if it would clip the viewport top
     // bottom css = vh - pos.top  →  tooltip top in viewport = vh - bottomCss - height = pos.top - height
@@ -92,9 +132,10 @@ function clampToViewport(tipEl, pos) {
       top = r.height + EDGE; // new pos.top so that tipTop == EDGE
       changed = true;
     }
+    maxHeight = Math.max(MIN_PANEL_H, pos.top - EDGE);
   }
 
-  return changed ? { ...pos, top, left } : null;
+  return changed ? { ...pos, top, left, placement, maxHeight } : null;
 }
 
 /* ─── Tooltip panel ──────────────────────────────────────────────────────── */
@@ -111,8 +152,8 @@ function TooltipPanel({ hint, pos, onMouseEnter, onMouseLeave, onReposition }) {
   }, []); // run once on mount (pos won't change identity here)
 
   const style = pos.placement === 'above'
-    ? { left: pos.left, bottom: `${window.innerHeight - pos.top}px` }
-    : { left: pos.left, top: pos.top };
+    ? { left: pos.left, bottom: `${window.innerHeight - pos.top}px`, maxHeight: pos.maxHeight ? `${pos.maxHeight}px` : undefined }
+    : { left: pos.left, top: pos.top, maxHeight: pos.maxHeight ? `${pos.maxHeight}px` : undefined };
 
   return (
     <div
