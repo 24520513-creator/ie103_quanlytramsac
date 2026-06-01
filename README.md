@@ -11,6 +11,7 @@
 - `backend`: API xác thực, catalog chức năng, gọi SQL Server, export PDF/CSV, import JSON.
 - `frontend`: giao diện người dùng, layout quản trị, dashboard, bảng dữ liệu và form động.
 - `docker-compose.yml`: đóng gói frontend/backend; SQL Server có thể dùng instance ngoài.
+- `docs`: tài liệu phân tích database và tính năng của đồ án (IE103).
 
 ## Database
 
@@ -29,11 +30,6 @@ database/06_Create_Triggers.sql
 database/07_Create_AppViews.sql
 database/08_Create_Security.sql
 database/09_Seed_Demo_Data.sql
-database/BonusSQL/01_Web_Lookups_Customer.sql
-database/BonusSQL/02_Web_Lookups_Operations.sql
-database/BonusSQL/03_Web_Lookups_Business_Admin.sql
-database/BonusSQL/04_Web_PricingPolicy_Actions.sql
-database/BonusSQL/05_Web_Reports.sql
 database/features/security/08_sql_authentication_logins.sql
 ```
 

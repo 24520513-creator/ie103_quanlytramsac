@@ -763,5 +763,385 @@ FROM Audit.AuditLog
 ORDER BY ChangedAt DESC, AuditID DESC;
 GO
 
+/* ============================================================================
+   Web lookup views — cung cap option co the doc duoc cho cac o chon tren web UI
+   (truoc day nam o BonusSQL/01..03). Khong sua bang, seed hay procedure goc.
+   GRANT cho cac DB role nam trong 08_Create_Security.sql.
+   ============================================================================ */
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupConnectorTypes
+AS
+SELECT
+    ConnectorTypeID,
+    ConnectorCode,
+    ConnectorName,
+    MaxPowerKW,
+    IsActive
+FROM Infrastructure.ConnectorType
+WHERE IsActive = 1;
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupCustomerVehicles
+AS
+SELECT
+    v.VehicleID,
+    v.UserID,
+    v.PlateNumber,
+    v.Brand,
+    v.Model,
+    v.BatteryCapacityKWh,
+    v.PreferredConnectorTypeID,
+    ct.ConnectorCode,
+    ct.ConnectorName,
+    v.IsActive,
+    v.CreatedAt
+FROM Operations.Vehicle v
+LEFT JOIN Infrastructure.ConnectorType ct ON ct.ConnectorTypeID = v.PreferredConnectorTypeID
+WHERE v.UserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'));
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupAvailablePoints
+AS
+SELECT
+    r.RegionName,
+    s.StationID,
+    s.StationCode,
+    s.StationName,
+    p.PointID,
+    p.PointCode,
+    p.PointStatus,
+    p.HealthStatus,
+    ct.ConnectorCode,
+    ct.ConnectorName,
+    p.PowerKW
+FROM Infrastructure.ChargingPoint p
+JOIN Infrastructure.ChargingStation s ON s.StationID = p.StationID
+JOIN Infrastructure.ConnectorType ct ON ct.ConnectorTypeID = p.ConnectorTypeID
+LEFT JOIN Core.Address a ON a.AddressID = s.AddressID
+LEFT JOIN Core.Region r ON r.RegionID = a.RegionID
+WHERE s.StationStatus = N'Active'
+  AND p.PointStatus = N'Available'
+  AND p.HealthStatus <> N'Offline';
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupCustomerBookings
+AS
+SELECT
+    b.BookingID,
+    b.BookingCode,
+    b.UserID,
+    b.VehicleID,
+    b.PointID,
+    b.StationID,
+    v.PlateNumber,
+    s.StationCode,
+    s.StationName,
+    p.PointCode,
+    b.BookedFrom,
+    b.BookedTo,
+    b.BookingStatus,
+    b.CreatedAt
+FROM Operations.Booking b
+LEFT JOIN Operations.Vehicle v ON v.VehicleID = b.VehicleID
+JOIN Infrastructure.ChargingPoint p ON p.PointID = b.PointID
+JOIN Infrastructure.ChargingStation s ON s.StationID = b.StationID
+WHERE b.UserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'));
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupCustomerSessions
+AS
+SELECT
+    cs.SessionID,
+    cs.SessionCode,
+    cs.UserID,
+    cs.VehicleID,
+    cs.PointID,
+    cs.StationID,
+    cs.BookingID,
+    v.PlateNumber,
+    s.StationCode,
+    s.StationName,
+    p.PointCode,
+    cs.StartTime,
+    cs.EndTime,
+    cs.TotalKWh,
+    cs.CostTotal,
+    cs.SessionStatus,
+    CAST(CASE WHEN EXISTS (
+        SELECT 1
+        FROM Payments.PaymentTransaction pt
+        WHERE pt.SessionID = cs.SessionID
+          AND pt.TransactionStatus = N'Completed'
+    ) THEN 1 ELSE 0 END AS BIT) AS HasCompletedPayment,
+    CAST(CASE WHEN EXISTS (
+        SELECT 1
+        FROM Payments.Invoice i
+        WHERE i.SessionID = cs.SessionID
+    ) THEN 1 ELSE 0 END AS BIT) AS HasInvoice
+FROM Operations.ChargingSession cs
+LEFT JOIN Operations.Vehicle v ON v.VehicleID = cs.VehicleID
+JOIN Infrastructure.ChargingStation s ON s.StationID = cs.StationID
+JOIN Infrastructure.ChargingPoint p ON p.PointID = cs.PointID
+WHERE cs.UserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'));
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupStations
+AS
+SELECT
+    s.StationID,
+    s.StationCode,
+    s.StationName,
+    s.StationStatus,
+    s.MaxPowerKW,
+    a.FullAddress
+FROM Infrastructure.ChargingStation s
+LEFT JOIN Core.Address a ON a.AddressID = s.AddressID
+WHERE s.StationStatus <> N'Retired';
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupPoints
+AS
+SELECT
+    p.PointID,
+    p.PointCode,
+    p.StationID,
+    s.StationCode,
+    s.StationName,
+    p.PointStatus,
+    p.HealthStatus,
+    ct.ConnectorCode,
+    ct.ConnectorName,
+    p.PowerKW
+FROM Infrastructure.ChargingPoint p
+JOIN Infrastructure.ChargingStation s ON s.StationID = p.StationID
+JOIN Infrastructure.ConnectorType ct ON ct.ConnectorTypeID = p.ConnectorTypeID
+WHERE p.PointStatus <> N'Retired';
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupActiveSessions
+AS
+SELECT
+    cs.SessionID,
+    cs.SessionCode,
+    u.Username,
+    u.FullName,
+    v.PlateNumber,
+    s.StationCode,
+    s.StationName,
+    p.PointCode,
+    cs.StartTime,
+    cs.SessionStatus
+FROM Operations.ChargingSession cs
+JOIN [Identity].UserAccount u ON u.UserID = cs.UserID
+LEFT JOIN Operations.Vehicle v ON v.VehicleID = cs.VehicleID
+JOIN Infrastructure.ChargingStation s ON s.StationID = cs.StationID
+JOIN Infrastructure.ChargingPoint p ON p.PointID = cs.PointID
+WHERE cs.SessionStatus = N'Charging';
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupOpenTickets
+AS
+SELECT
+    mt.TicketID,
+    mt.TicketCode,
+    mt.Priority,
+    mt.TicketStatus,
+    mt.Title,
+    mt.OpenedAt,
+    s.StationCode,
+    s.StationName,
+    p.PointCode,
+    assignedTo.Username AS AssignedToUsername,
+    assignedTo.FullName AS AssignedToFullName
+FROM Maintenance.MaintenanceTicket mt
+LEFT JOIN Infrastructure.ChargingStation s ON s.StationID = mt.StationID
+LEFT JOIN Infrastructure.ChargingPoint p ON p.PointID = mt.PointID
+LEFT JOIN [Identity].UserAccount assignedTo ON assignedTo.UserID = mt.AssignedTo
+WHERE mt.TicketStatus IN (N'Open', N'Assigned', N'InProgress', N'Resolved');
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupOperationsStaff
+AS
+SELECT DISTINCT
+    u.UserID,
+    u.Username,
+    u.FullName,
+    u.Email,
+    u.AccountStatus
+FROM [Identity].UserAccount u
+JOIN [Identity].UserRole ur ON ur.UserID = u.UserID
+JOIN [Identity].[Role] r ON r.RoleID = ur.RoleID
+WHERE r.RoleCode = N'OperationsStaff'
+  AND u.AccountStatus = N'Active';
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupPricingPolicies
+AS
+SELECT
+    PolicyID,
+    PolicyCode,
+    PolicyName,
+    BasePricePerKWh,
+    PeakMultiplier,
+    AppliedFrom,
+    AppliedTo,
+    IsActive
+FROM Operations.PricingPolicy;
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupRevenueSharePolicies
+AS
+SELECT
+    rsp.RevenueSharePolicyID,
+    f.FranchiseID,
+    f.FranchiseCode,
+    f.FranchiseName,
+    fc.ContractID,
+    fc.ContractCode,
+    rsp.PolicyCode,
+    rsp.PartnerShareRate,
+    rsp.PlatformShareRate,
+    rsp.AppliedFrom,
+    rsp.AppliedTo,
+    rsp.IsActive
+FROM Franchise.RevenueSharePolicy rsp
+JOIN Franchise.FranchiseContract fc ON fc.ContractID = rsp.ContractID
+JOIN Franchise.FranchisePartner f ON f.FranchiseID = fc.FranchiseID
+WHERE rsp.IsActive = 1
+  AND fc.ContractStatus = N'Active'
+  AND f.PartnerStatus = N'Active';
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupFranchises
+AS
+SELECT
+    FranchiseID,
+    FranchiseCode,
+    FranchiseName,
+    PartnerStatus,
+    ContactPerson,
+    ContactPhone,
+    ContactEmail
+FROM Franchise.FranchisePartner;
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupRefundablePayments
+AS
+SELECT
+    pt.TransactionID,
+    pt.TransactionCode,
+    pt.PaymentMethod,
+    pt.Amount,
+    pt.PaidAt,
+    pt.TransactionStatus,
+    u.UserID,
+    u.Username,
+    u.FullName,
+    cs.SessionID,
+    cs.SessionCode,
+    i.InvoiceID,
+    i.InvoiceCode,
+    s.StationCode,
+    s.StationName,
+    p.PointCode
+FROM Payments.PaymentTransaction pt
+JOIN [Identity].UserAccount u ON u.UserID = pt.UserID
+JOIN Operations.ChargingSession cs ON cs.SessionID = pt.SessionID
+LEFT JOIN Payments.Invoice i ON i.TransactionID = pt.TransactionID
+JOIN Infrastructure.ChargingStation s ON s.StationID = cs.StationID
+JOIN Infrastructure.ChargingPoint p ON p.PointID = cs.PointID
+WHERE pt.TransactionStatus = N'Completed';
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupUsers
+AS
+SELECT
+    u.UserID,
+    u.Username,
+    u.FullName,
+    u.Email,
+    u.Phone,
+    u.AccountStatus,
+    STRING_AGG(r.RoleCode, N', ') AS RoleCodes
+FROM [Identity].UserAccount u
+LEFT JOIN [Identity].UserRole ur ON ur.UserID = u.UserID
+LEFT JOIN [Identity].[Role] r ON r.RoleID = ur.RoleID
+GROUP BY u.UserID, u.Username, u.FullName, u.Email, u.Phone, u.AccountStatus;
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupAssignableRoles
+AS
+SELECT
+    u.UserID,
+    r.RoleCode,
+    r.RoleName
+FROM [Identity].UserAccount u
+CROSS JOIN [Identity].[Role] r
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM [Identity].UserRole ur
+    WHERE ur.UserID = u.UserID
+      AND ur.RoleID = r.RoleID
+);
+GO
+
+CREATE OR ALTER VIEW AppView.vw_WebLookupRemovableRoles
+AS
+SELECT
+    ur.UserID,
+    r.RoleCode,
+    r.RoleName
+FROM [Identity].UserRole ur
+JOIN [Identity].[Role] r ON r.RoleID = ur.RoleID;
+GO
+
+/* ============================================================================
+   Web report views — bao cao phan tich bo sung cho web (truoc day o BonusSQL/05).
+   ============================================================================ */
+
+/* Doanh thu theo tram theo NAM — bao cao so sanh YoY. Dung cho BusinessManager. */
+CREATE OR ALTER VIEW AppView.vw_StationRevenueByYear
+AS
+SELECT
+    s.StationID,
+    s.StationCode,
+    s.StationName,
+    YEAR(cs.StartTime)              AS RevenueYear,
+    COUNT(cs.SessionID)             AS CompletedSessions,
+    SUM(ISNULL(cs.TotalKWh, 0))     AS TotalKWh,
+    SUM(ISNULL(cs.CostTotal, 0))    AS RevenueTotal
+FROM Operations.ChargingSession cs
+JOIN Infrastructure.ChargingStation s ON s.StationID = cs.StationID
+WHERE cs.SessionStatus = N'Completed'
+GROUP BY s.StationID, s.StationCode, s.StationName, YEAR(cs.StartTime);
+GO
+
+/* So tai khoan theo vai tro va trang thai — dung cho SystemAdmin (chart + report). */
+CREATE OR ALTER VIEW AppView.vw_AccountsByRole
+AS
+SELECT
+    COALESCE(r.RoleCode, N'(Chưa gán)') AS RoleCode,
+    u.AccountStatus,
+    COUNT(DISTINCT u.UserID)            AS AccountCount
+FROM [Identity].UserAccount u
+LEFT JOIN [Identity].UserRole ur ON ur.UserID = u.UserID
+LEFT JOIN [Identity].[Role] r    ON r.RoleID = ur.RoleID
+GROUP BY COALESCE(r.RoleCode, N'(Chưa gán)'), u.AccountStatus;
+GO
+
+/* Tong hop sac theo thang cua CHINH khach hang dang dang nhap (loc theo SESSION_CONTEXT). */
+CREATE OR ALTER VIEW AppView.vw_MyChargingSummary
+AS
+SELECT
+    YEAR(cs.StartTime)              AS UsageYear,
+    MONTH(cs.StartTime)            AS UsageMonth,
+    COUNT(cs.SessionID)            AS SessionCount,
+    SUM(ISNULL(cs.TotalKWh, 0))   AS TotalKWh,
+    SUM(ISNULL(cs.CostTotal, 0))  AS TotalSpend
+FROM Operations.ChargingSession cs
+WHERE cs.UserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'))
+GROUP BY YEAR(cs.StartTime), MONTH(cs.StartTime);
+GO
+
 PRINT N'07 - Application data views and query procedures created.';
 GO

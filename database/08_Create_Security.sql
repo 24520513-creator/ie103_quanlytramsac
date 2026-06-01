@@ -225,6 +225,56 @@ DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::Operations TO db_ev_franchise_par
 DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::Maintenance TO db_ev_franchise_partner;
 GO
 
+/* ============================================================================
+   Web lookup / report views + web action — quyen cho cac doi tuong AppView
+   phuc vu web UI (truoc day nam o BonusSQL/01..05). Cac view/proc duoc tao o
+   05_Create_Stored_Procedures.sql va 07_Create_AppViews.sql.
+   ============================================================================ */
+
+-- Customer web lookups
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupConnectorTypes TO db_ev_customer;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupConnectorTypes TO db_ev_operations_staff;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupConnectorTypes TO db_ev_business_manager;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupConnectorTypes TO db_ev_system_admin;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupCustomerVehicles TO db_ev_customer;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupAvailablePoints TO db_ev_customer;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupCustomerBookings TO db_ev_customer;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupCustomerSessions TO db_ev_customer;
+
+-- Operations web lookups
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupStations TO db_ev_operations_staff;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupPoints TO db_ev_operations_staff;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupActiveSessions TO db_ev_operations_staff;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupOpenTickets TO db_ev_operations_staff;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupOperationsStaff TO db_ev_operations_staff;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupStations TO db_ev_system_admin;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupPoints TO db_ev_system_admin;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupActiveSessions TO db_ev_system_admin;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupOpenTickets TO db_ev_system_admin;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupOperationsStaff TO db_ev_system_admin;
+
+-- Business / Admin web lookups
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupPricingPolicies TO db_ev_business_manager;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupRevenueSharePolicies TO db_ev_business_manager;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupFranchises TO db_ev_business_manager;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupRefundablePayments TO db_ev_business_manager;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupPricingPolicies TO db_ev_system_admin;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupRevenueSharePolicies TO db_ev_system_admin;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupFranchises TO db_ev_system_admin;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupRefundablePayments TO db_ev_system_admin;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupUsers TO db_ev_system_admin;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupAssignableRoles TO db_ev_system_admin;
+GRANT SELECT ON OBJECT::AppView.vw_WebLookupRemovableRoles TO db_ev_system_admin;
+
+-- Web report views
+GRANT SELECT ON OBJECT::AppView.vw_StationRevenueByYear TO db_ev_business_manager;
+GRANT SELECT ON OBJECT::AppView.vw_AccountsByRole TO db_ev_system_admin;
+GRANT SELECT ON OBJECT::AppView.vw_MyChargingSummary TO db_ev_customer;
+
+-- Web pricing policy action
+GRANT EXECUTE ON OBJECT::AppView.sp_ActivatePricingPolicy TO db_ev_business_manager;
+GO
+
 PRINT N'08 - Core security roles, users, GRANT and DENY permissions created.';
 GO
 

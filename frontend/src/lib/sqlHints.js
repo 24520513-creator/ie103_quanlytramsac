@@ -1403,7 +1403,7 @@ END;`,
       sp('UPDATE', 'Operations.PricingPolicy', 'IsActive = 1'),
       sp('INSERT', 'Audit.AuditLog'),
     ],
-    sql: `-- File: database/BonusSQL/04_Web_PricingPolicy_Actions.sql
+    sql: `-- File: database/05_Create_Stored_Procedures.sql
 CREATE OR ALTER PROCEDURE AppView.sp_ActivatePricingPolicy
     @PolicyID INT
 AS

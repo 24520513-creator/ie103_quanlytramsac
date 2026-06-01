@@ -1517,5 +1517,54 @@ BEGIN
 END;
 GO
 
+/* ----------------------------------------------------------------------------
+   Web action — kich hoat lai pricing policy da bi vo hieu hoa (truoc day o
+   BonusSQL/04). EXECUTE grant cho db_ev_business_manager nam o 08_Create_Security.
+   ---------------------------------------------------------------------------- */
+CREATE OR ALTER PROCEDURE AppView.sp_ActivatePricingPolicy
+    @PolicyID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRAN;
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM Operations.PricingPolicy
+            WHERE PolicyID = @PolicyID
+        )
+            THROW 57001, 'Pricing policy does not exist.', 1;
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM Operations.PricingPolicy
+            WHERE PolicyID = @PolicyID
+              AND IsActive = 0
+        )
+            THROW 57002, 'Pricing policy is already active.', 1;
+
+        UPDATE Operations.PricingPolicy
+        SET IsActive = 1
+        WHERE PolicyID = @PolicyID;
+
+        INSERT INTO Audit.AuditLog (SchemaName, TableName, RecordID, ActionType, NewValues)
+        VALUES (N'Operations', N'PricingPolicy', CAST(@PolicyID AS NVARCHAR(100)), N'UPDATE', N'Active');
+
+        COMMIT;
+
+        SELECT PolicyID, PolicyCode, PolicyName, IsActive
+        FROM Operations.PricingPolicy
+        WHERE PolicyID = @PolicyID;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK;
+        THROW;
+    END CATCH
+END;
+GO
+
 PRINT N'05 - Simplified stored procedures created.';
 GO
