@@ -643,8 +643,8 @@ export const actions = {
   }),
 
   stationRevenueTrend: queryAction({
-    title: 'Xu huong doanh thu theo thoi gian',
-    description: 'Du lieu tong hop theo ngay cho bieu do doanh thu.',
+    title: 'Xu hướng doanh thu theo thời gian',
+    description: 'Dữ liệu tổng hợp theo ngày cho biểu đồ doanh thu.',
     group: 'reports',
     roles: ['BusinessManager'],
     sql: `
@@ -660,8 +660,8 @@ export const actions = {
     orderBy: 'RevenueDate',
     searchColumns: [],
     params: [
-      { name: 'FromDate', label: 'Tu ngay', type: 'date' },
-      { name: 'ToDate', label: 'Den ngay', type: 'date' }
+      { name: 'FromDate', label: 'Từ ngày', type: 'date' },
+      { name: 'ToDate', label: 'Đến ngày', type: 'date' }
     ],
     columns: ['RevenueDate', 'CompletedSessions', 'TotalKWh', 'RevenueTotal']
   }),

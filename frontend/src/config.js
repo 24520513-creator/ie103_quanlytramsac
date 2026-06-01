@@ -1,4 +1,4 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// API base URL lives in lib/api.js (single source of truth for the fetch layer).
 
 export const demoUsers = [
   ['customer01', 'Khách hàng'],
