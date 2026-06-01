@@ -4,7 +4,13 @@ GO
 CREATE INDEX IX_Address_RegionID ON Core.Address(RegionID);
 
 CREATE INDEX IX_UserAccount_Status ON [Identity].UserAccount(AccountStatus);
+CREATE INDEX IX_UserAccount_Email ON [Identity].UserAccount(Email);
+CREATE INDEX IX_UserAccount_Phone ON [Identity].UserAccount(Phone);
 CREATE INDEX IX_UserRole_RoleID ON [Identity].UserRole(RoleID);
+CREATE INDEX IX_AuthToken_UserType ON [Identity].AuthToken(UserID, TokenType, ExpiresAt DESC);
+CREATE INDEX IX_AuthToken_Expires ON [Identity].AuthToken(ExpiresAt) WHERE ConsumedAt IS NULL;
+CREATE INDEX IX_AuthEvent_UserTime ON [Identity].AuthEvent(UserID, CreatedAt DESC);
+CREATE INDEX IX_AuthEvent_TypeTime ON [Identity].AuthEvent(EventType, CreatedAt DESC);
 
 CREATE INDEX IX_FranchisePartner_Status ON Franchise.FranchisePartner(PartnerStatus);
 CREATE INDEX IX_FranchiseContract_FranchiseID ON Franchise.FranchiseContract(FranchiseID);

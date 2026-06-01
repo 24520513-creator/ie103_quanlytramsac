@@ -24,7 +24,9 @@ JOIN [Identity].UserAccount u ON u.UserID = cs.UserID
 LEFT JOIN Operations.Vehicle v ON v.VehicleID = cs.VehicleID
 JOIN Infrastructure.ChargingStation s ON s.StationID = cs.StationID
 JOIN Infrastructure.ChargingPoint p ON p.PointID = cs.PointID
-JOIN Infrastructure.ConnectorType ct ON ct.ConnectorTypeID = p.ConnectorTypeID;
+JOIN Infrastructure.ConnectorType ct ON ct.ConnectorTypeID = p.ConnectorTypeID
+WHERE NOT (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'Customer' OR IS_ROLEMEMBER(N'db_ev_customer') = 1)
+   OR cs.UserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'));
 GO
 
 CREATE OR ALTER VIEW AppView.vw_StationRevenueDaily
@@ -99,7 +101,8 @@ SELECT
 FROM Franchise.FranchisePartner f
 JOIN [Identity].UserAccount u ON u.UserID = f.ContactUserID
 LEFT JOIN Core.Address a ON a.AddressID = f.AddressID
-WHERE u.Username = USER_NAME();
+WHERE NOT (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'FranchisePartner' OR IS_ROLEMEMBER(N'db_ev_franchise_partner') = 1)
+   OR f.ContactUserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'));
 GO
 
 CREATE OR ALTER VIEW AppView.vw_MyFranchiseContracts
@@ -116,7 +119,8 @@ SELECT
 FROM Franchise.FranchiseContract fc
 JOIN Franchise.FranchisePartner f ON f.FranchiseID = fc.FranchiseID
 JOIN [Identity].UserAccount u ON u.UserID = f.ContactUserID
-WHERE u.Username = USER_NAME();
+WHERE NOT (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'FranchisePartner' OR IS_ROLEMEMBER(N'db_ev_franchise_partner') = 1)
+   OR f.ContactUserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'));
 GO
 
 CREATE OR ALTER VIEW AppView.vw_MyFranchiseStations
@@ -138,7 +142,8 @@ JOIN [Identity].UserAccount u ON u.UserID = f.ContactUserID
 JOIN Infrastructure.ChargingStation s ON s.StationID = fs.StationID
 JOIN Franchise.FranchiseContract fc ON fc.ContractID = fs.ContractID
 LEFT JOIN Core.Address a ON a.AddressID = s.AddressID
-WHERE u.Username = USER_NAME();
+WHERE NOT (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'FranchisePartner' OR IS_ROLEMEMBER(N'db_ev_franchise_partner') = 1)
+   OR f.ContactUserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'));
 GO
 
 CREATE OR ALTER VIEW AppView.vw_MyRevenueSharePolicies
@@ -158,7 +163,8 @@ FROM Franchise.RevenueSharePolicy rsp
 JOIN Franchise.FranchiseContract fc ON fc.ContractID = rsp.ContractID
 JOIN Franchise.FranchisePartner f ON f.FranchiseID = fc.FranchiseID
 JOIN [Identity].UserAccount u ON u.UserID = f.ContactUserID
-WHERE u.Username = USER_NAME();
+WHERE NOT (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'FranchisePartner' OR IS_ROLEMEMBER(N'db_ev_franchise_partner') = 1)
+   OR f.ContactUserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'));
 GO
 
 CREATE OR ALTER VIEW AppView.vw_MyRevenueShareSettlements
@@ -175,13 +181,13 @@ SELECT
     rs.PartnerShareAmount,
     rs.PlatformShareAmount,
     rs.SettlementStatus,
-    rs.ApprovedAt,
-    rs.PaidAt
+    rs.ApprovedAt
 FROM Franchise.RevenueShareSettlement rs
 JOIN Franchise.FranchisePartner f ON f.FranchiseID = rs.FranchiseID
 JOIN [Identity].UserAccount u ON u.UserID = f.ContactUserID
 JOIN Franchise.FranchiseContract fc ON fc.ContractID = rs.ContractID
-WHERE u.Username = USER_NAME();
+WHERE NOT (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'FranchisePartner' OR IS_ROLEMEMBER(N'db_ev_franchise_partner') = 1)
+   OR f.ContactUserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'));
 GO
 
 CREATE OR ALTER VIEW AppView.vw_ConnectorUtilization
@@ -271,7 +277,9 @@ FROM Operations.Booking b
 JOIN [Identity].UserAccount u ON u.UserID = b.UserID
 LEFT JOIN Operations.Vehicle v ON v.VehicleID = b.VehicleID
 JOIN Infrastructure.ChargingPoint p ON p.PointID = b.PointID
-JOIN Infrastructure.ChargingStation s ON s.StationID = p.StationID;
+JOIN Infrastructure.ChargingStation s ON s.StationID = p.StationID
+WHERE NOT (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'Customer' OR IS_ROLEMEMBER(N'db_ev_customer') = 1)
+   OR b.UserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'));
 GO
 
 CREATE OR ALTER VIEW AppView.vw_InvoiceDetail
@@ -302,7 +310,9 @@ JOIN Payments.PaymentTransaction pt ON pt.TransactionID = i.TransactionID
 JOIN Operations.ChargingSession cs ON cs.SessionID = pt.SessionID
 JOIN [Identity].UserAccount u ON u.UserID = cs.UserID
 JOIN Infrastructure.ChargingStation s ON s.StationID = cs.StationID
-JOIN Infrastructure.ChargingPoint p ON p.PointID = cs.PointID;
+JOIN Infrastructure.ChargingPoint p ON p.PointID = cs.PointID
+WHERE NOT (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'Customer' OR IS_ROLEMEMBER(N'db_ev_customer') = 1)
+   OR cs.UserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'));
 GO
 
 CREATE OR ALTER VIEW AppView.vw_ActiveChargingSessions
@@ -337,7 +347,7 @@ SELECT
     COUNT(p.PointID) AS TotalPoints,
     SUM(CASE WHEN p.PointStatus = N'Available' THEN 1 ELSE 0 END) AS AvailablePoints,
     SUM(CASE WHEN p.PointStatus = N'Charging' THEN 1 ELSE 0 END) AS ChargingPoints,
-    SUM(CASE WHEN p.PointStatus IN (N'Faulted', N'Maintenance') THEN 1 ELSE 0 END) AS ProblemPoints,
+    SUM(CASE WHEN p.PointStatus IN (N'Error', N'Maintenance', N'Offline') THEN 1 ELSE 0 END) AS ProblemPoints,
     MAX(psh.ChangedAt) AS LastStatusChangeAt
 FROM Infrastructure.ChargingStation s
 LEFT JOIN Infrastructure.ChargingPoint p ON p.StationID = s.StationID
@@ -535,7 +545,7 @@ BEGIN
     SELECT SettlementID, SettlementCode, FranchiseCode, FranchiseName,
            ContractCode, PeriodStart, PeriodEnd, GrossRevenue,
            PartnerShareAmount, PlatformShareAmount, SettlementStatus,
-           ApprovedAt, PaidAt
+           ApprovedAt
     FROM AppView.vw_MyRevenueShareSettlements
     ORDER BY PeriodEnd DESC, SettlementCode;
 END;
@@ -595,6 +605,163 @@ BEGIN
 END;
 GO
 
-PRINT N'07 - Application data views and query procedures created.';
+CREATE OR ALTER VIEW AppView.vw_CurrentUserProfile
+AS
+SELECT
+    u.UserID,
+    u.Username,
+    u.FullName,
+    u.Email,
+    u.Phone,
+    u.AccountStatus,
+    STRING_AGG(r.RoleCode, N',') AS RoleCodes,
+    STRING_AGG(r.RoleName, N', ') AS RoleNames,
+    u.LastLoginAt,
+    u.CreatedAt,
+    u.UpdatedAt
+FROM [Identity].UserAccount u
+JOIN [Identity].UserRole ur ON ur.UserID = u.UserID
+JOIN [Identity].[Role] r ON r.RoleID = ur.RoleID
+WHERE u.UserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'))
+GROUP BY u.UserID, u.Username, u.FullName, u.Email, u.Phone, u.AccountStatus, u.LastLoginAt, u.CreatedAt, u.UpdatedAt;
 GO
 
+CREATE OR ALTER PROCEDURE AppView.sp_GetCurrentUserProfile
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT * FROM AppView.vw_CurrentUserProfile;
+END;
+GO
+
+CREATE OR ALTER VIEW AppView.vw_MyVehicles
+AS
+SELECT
+    v.VehicleID,
+    v.UserID,
+    v.PlateNumber,
+    v.Brand,
+    v.Model,
+    v.BatteryCapacityKWh,
+    v.PreferredConnectorTypeID,
+    ct.ConnectorCode,
+    ct.ConnectorName,
+    v.IsActive,
+    v.CreatedAt
+FROM Operations.Vehicle v
+LEFT JOIN Infrastructure.ConnectorType ct ON ct.ConnectorTypeID = v.PreferredConnectorTypeID
+WHERE v.UserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'));
+GO
+
+CREATE OR ALTER VIEW AppView.vw_PricingPolicies
+AS
+SELECT
+    PolicyID,
+    PolicyCode,
+    PolicyName,
+    BasePricePerKWh,
+    PeakMultiplier,
+    PeakStartHour,
+    PeakEndHour,
+    AppliedFrom,
+    AppliedTo,
+    IsActive
+FROM Operations.PricingPolicy;
+GO
+
+CREATE OR ALTER VIEW AppView.vw_RefundablePayments
+AS
+SELECT
+    pt.TransactionID,
+    pt.TransactionCode,
+    pt.TransactionStatus,
+    pt.PaymentMethod,
+    pt.Amount,
+    pt.PaidAt,
+    pt.CreatedAt,
+    u.UserID,
+    u.Username,
+    u.FullName,
+    cs.SessionID,
+    cs.SessionCode,
+    i.InvoiceID,
+    i.InvoiceCode,
+    i.InvoiceStatus,
+    s.StationCode,
+    s.StationName,
+    p.PointCode
+FROM Payments.PaymentTransaction pt
+JOIN [Identity].UserAccount u ON u.UserID = pt.UserID
+JOIN Operations.ChargingSession cs ON cs.SessionID = pt.SessionID
+LEFT JOIN Payments.Invoice i ON i.TransactionID = pt.TransactionID
+JOIN Infrastructure.ChargingStation s ON s.StationID = cs.StationID
+JOIN Infrastructure.ChargingPoint p ON p.PointID = cs.PointID
+WHERE pt.TransactionStatus = N'Completed';
+GO
+
+CREATE OR ALTER VIEW AppView.vw_MaintenanceTickets
+AS
+SELECT
+    mt.TicketID,
+    mt.TicketCode,
+    mt.Priority,
+    mt.TicketStatus,
+    mt.Title,
+    mt.Description,
+    mt.OpenedAt,
+    mt.ClosedAt,
+    s.StationID,
+    s.StationCode,
+    s.StationName,
+    p.PointID,
+    p.PointCode,
+    createdBy.Username AS CreatedByUsername,
+    createdBy.FullName AS CreatedByFullName,
+    assignedTo.Username AS AssignedToUsername,
+    assignedTo.FullName AS AssignedToFullName
+FROM Maintenance.MaintenanceTicket mt
+LEFT JOIN Infrastructure.ChargingStation s ON s.StationID = mt.StationID
+LEFT JOIN Infrastructure.ChargingPoint p ON p.PointID = mt.PointID
+LEFT JOIN [Identity].UserAccount createdBy ON createdBy.UserID = mt.CreatedBy
+LEFT JOIN [Identity].UserAccount assignedTo ON assignedTo.UserID = mt.AssignedTo;
+GO
+
+CREATE OR ALTER VIEW AppView.vw_ErrorLogActive
+AS
+SELECT
+    e.ErrorID,
+    e.ErrorCode,
+    e.Severity,
+    e.Description,
+    e.OccurredAt,
+    e.ResolvedAt,
+    e.IsActive,
+    s.StationID,
+    s.StationCode,
+    s.StationName,
+    p.PointID,
+    p.PointCode
+FROM Maintenance.ErrorLog e
+LEFT JOIN Infrastructure.ChargingStation s ON s.StationID = e.StationID
+LEFT JOIN Infrastructure.ChargingPoint p ON p.PointID = e.PointID
+WHERE e.IsActive = 1;
+GO
+
+CREATE OR ALTER VIEW AppView.vw_AuditLogRecent
+AS
+SELECT TOP (1000)
+    AuditID,
+    SchemaName,
+    TableName,
+    RecordID,
+    ActionType,
+    ChangedBy,
+    ChangedAt,
+    OldValues,
+    NewValues
+FROM Audit.AuditLog
+ORDER BY ChangedAt DESC, AuditID DESC;
+GO
+
+PRINT N'07 - Application data views and query procedures created.';
+GO

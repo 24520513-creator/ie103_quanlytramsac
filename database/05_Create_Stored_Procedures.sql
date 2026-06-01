@@ -42,6 +42,184 @@ BEGIN
 END;
 GO
 
+CREATE OR ALTER PROCEDURE [Identity].sp_RegisterCustomer
+    @Username NVARCHAR(50),
+    @Email NVARCHAR(120),
+    @Phone NVARCHAR(20) = NULL,
+    @PasswordHash NVARCHAR(256),
+    @FullName NVARCHAR(120)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        IF EXISTS (SELECT 1 FROM [Identity].UserAccount WHERE Username = @Username)
+            THROW 51101, N'Tên đăng nhập đã được sử dụng.', 1;
+        IF EXISTS (SELECT 1 FROM [Identity].UserAccount WHERE Email = @Email)
+            THROW 51102, N'Email đã được sử dụng.', 1;
+        IF @Phone IS NOT NULL AND EXISTS (SELECT 1 FROM [Identity].UserAccount WHERE Phone = @Phone)
+            THROW 51103, N'Số điện thoại đã được sử dụng.', 1;
+
+        DECLARE @RoleID INT = (SELECT RoleID FROM [Identity].Role WHERE RoleCode = N'Customer');
+        IF @RoleID IS NULL
+            THROW 51104, N'Vai trò Customer chưa tồn tại.', 1;
+
+        INSERT INTO [Identity].UserAccount (Username, Email, Phone, PasswordHash, FullName, AccountStatus)
+        VALUES (@Username, @Email, NULLIF(@Phone, N''), @PasswordHash, @FullName, N'Active');
+
+        DECLARE @UserID INT = SCOPE_IDENTITY();
+        INSERT INTO [Identity].UserRole (UserID, RoleID) VALUES (@UserID, @RoleID);
+
+        INSERT INTO [Identity].AuthEvent (UserID, Identifier, EventType, EventStatus)
+        VALUES (@UserID, @Username, N'Register', N'Success');
+
+        INSERT INTO Audit.AuditLog (SchemaName, TableName, RecordID, ActionType, NewValues)
+        VALUES (N'Identity', N'UserAccount', CAST(@UserID AS NVARCHAR(100)), N'SECURITY', N'Register customer');
+
+        COMMIT TRANSACTION;
+
+        SELECT UserID, Username, Email, Phone, FullName, AccountStatus
+        FROM [Identity].UserAccount
+        WHERE UserID = @UserID;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE [Identity].sp_RequestPasswordReset
+    @Identifier NVARCHAR(120),
+    @TokenHash NVARCHAR(128),
+    @ExpiresAt DATETIME2
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @UserID INT = (
+        SELECT TOP 1 UserID
+        FROM [Identity].UserAccount
+        WHERE Username = @Identifier OR Email = @Identifier OR Phone = @Identifier
+    );
+
+    IF @UserID IS NULL
+    BEGIN
+        INSERT INTO [Identity].AuthEvent (Identifier, EventType, EventStatus)
+        VALUES (@Identifier, N'PasswordResetRequested', N'Ignored');
+        SELECT CAST(NULL AS INT) AS UserID;
+        RETURN;
+    END;
+
+    INSERT INTO [Identity].AuthToken (UserID, TokenType, TokenHash, ExpiresAt)
+    VALUES (@UserID, N'PasswordReset', @TokenHash, @ExpiresAt);
+
+    INSERT INTO [Identity].AuthEvent (UserID, Identifier, EventType, EventStatus)
+    VALUES (@UserID, @Identifier, N'PasswordResetRequested', N'Success');
+
+    SELECT @UserID AS UserID;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE [Identity].sp_ResetPasswordByToken
+    @TokenHash NVARCHAR(128),
+    @PasswordHash NVARCHAR(256)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        DECLARE @UserID INT = (
+            SELECT TOP 1 UserID
+            FROM [Identity].AuthToken WITH (UPDLOCK, HOLDLOCK)
+            WHERE TokenHash = @TokenHash
+              AND TokenType = N'PasswordReset'
+              AND ConsumedAt IS NULL
+              AND ExpiresAt >= SYSDATETIME()
+        );
+
+        IF @UserID IS NULL
+            THROW 51110, N'Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.', 1;
+
+        UPDATE [Identity].UserAccount
+        SET PasswordHash = @PasswordHash, UpdatedAt = SYSDATETIME()
+        WHERE UserID = @UserID;
+
+        UPDATE [Identity].AuthToken
+        SET ConsumedAt = SYSDATETIME()
+        WHERE TokenHash = @TokenHash;
+
+        INSERT INTO [Identity].AuthEvent (UserID, EventType, EventStatus)
+        VALUES (@UserID, N'PasswordResetCompleted', N'Success');
+
+        INSERT INTO Audit.AuditLog (SchemaName, TableName, RecordID, ActionType, NewValues)
+        VALUES (N'Identity', N'UserAccount', CAST(@UserID AS NVARCHAR(100)), N'SECURITY', N'Password reset by token');
+
+        COMMIT TRANSACTION;
+
+        SELECT UserID, Username, Email, AccountStatus, UpdatedAt
+        FROM [Identity].UserAccount
+        WHERE UserID = @UserID;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE [Identity].sp_VerifyEmailToken
+    @TokenHash NVARCHAR(128)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        DECLARE @UserID INT = (
+            SELECT TOP 1 UserID
+            FROM [Identity].AuthToken WITH (UPDLOCK, HOLDLOCK)
+            WHERE TokenHash = @TokenHash
+              AND TokenType = N'EmailVerification'
+              AND ConsumedAt IS NULL
+              AND ExpiresAt >= SYSDATETIME()
+        );
+
+        IF @UserID IS NULL
+            THROW 51111, N'Token xác minh email không hợp lệ hoặc đã hết hạn.', 1;
+
+        UPDATE [Identity].UserAccount
+        SET AccountStatus = N'Active', UpdatedAt = SYSDATETIME()
+        WHERE UserID = @UserID AND AccountStatus = N'Pending';
+
+        UPDATE [Identity].AuthToken
+        SET ConsumedAt = SYSDATETIME()
+        WHERE TokenHash = @TokenHash;
+
+        INSERT INTO [Identity].AuthEvent (UserID, EventType, EventStatus)
+        VALUES (@UserID, N'EmailVerified', N'Success');
+
+        COMMIT TRANSACTION;
+
+        SELECT UserID, Username, Email, AccountStatus
+        FROM [Identity].UserAccount
+        WHERE UserID = @UserID;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
 CREATE OR ALTER PROCEDURE [Identity].sp_LockUser
     @UserID INT
 AS
@@ -396,6 +574,10 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
+        IF (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'Customer' OR IS_ROLEMEMBER(N'db_ev_customer') = 1)
+           AND ISNULL(@UserID, -1) <> ISNULL(TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID')), -2147483648)
+            THROW 52022, 'Customer can only create vehicle for current session user.', 1;
+
         IF NOT EXISTS (SELECT 1 FROM [Identity].UserAccount WHERE UserID = @UserID AND AccountStatus = N'Active')
             THROW 52020, 'Active user does not exist.', 1;
         IF @PreferredConnectorTypeID IS NOT NULL AND NOT EXISTS (SELECT 1 FROM Infrastructure.ConnectorType WHERE ConnectorTypeID = @PreferredConnectorTypeID AND IsActive = 1)
@@ -438,6 +620,10 @@ BEGIN
 
     BEGIN TRY
         BEGIN TRANSACTION;
+
+        IF (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'Customer' OR IS_ROLEMEMBER(N'db_ev_customer') = 1)
+           AND ISNULL(@UserID, -1) <> ISNULL(TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID')), -2147483648)
+            THROW 52032, 'Customer can only update own vehicle.', 1;
 
         IF NOT EXISTS (SELECT 1 FROM Operations.Vehicle WHERE VehicleID = @VehicleID AND UserID = @UserID)
             THROW 52030, 'Vehicle does not belong to user.', 1;
@@ -482,6 +668,10 @@ BEGIN
 
     BEGIN TRY
         BEGIN TRANSACTION;
+
+        IF (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'Customer' OR IS_ROLEMEMBER(N'db_ev_customer') = 1)
+           AND ISNULL(@UserID, -1) <> ISNULL(TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID')), -2147483648)
+            THROW 52046, 'Customer can only create booking for current session user.', 1;
 
         IF @BookedFrom >= @BookedTo
             THROW 52040, 'BookedFrom must be before BookedTo.', 1;
@@ -544,6 +734,10 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
+        IF (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'Customer' OR IS_ROLEMEMBER(N'db_ev_customer') = 1)
+           AND ISNULL(@UserID, -1) <> ISNULL(TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID')), -2147483648)
+            THROW 52051, 'Customer can only cancel own booking.', 1;
+
         IF NOT EXISTS (
             SELECT 1
             FROM Operations.Booking
@@ -587,6 +781,10 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
+        IF (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'Customer' OR IS_ROLEMEMBER(N'db_ev_customer') = 1)
+           AND ISNULL(@UserID, -1) <> ISNULL(TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID')), -2147483648)
+            THROW 52005, 'Customer can only start session for current session user.', 1;
+
         DECLARE @PointStatus NVARCHAR(30), @StationID INT;
         SELECT @PointStatus = PointStatus, @StationID = StationID
         FROM Infrastructure.ChargingPoint
@@ -599,6 +797,10 @@ BEGIN
 
         IF NOT EXISTS (SELECT 1 FROM [Identity].UserAccount WHERE UserID = @UserID AND AccountStatus = N'Active')
             THROW 52003, 'User account is not active.', 1;
+        IF @VehicleID IS NOT NULL AND NOT EXISTS (SELECT 1 FROM Operations.Vehicle WHERE VehicleID = @VehicleID AND UserID = @UserID AND IsActive = 1)
+            THROW 52006, 'Vehicle does not belong to user.', 1;
+        IF @BookingID IS NOT NULL AND NOT EXISTS (SELECT 1 FROM Operations.Booking WHERE BookingID = @BookingID AND UserID = @UserID AND PointID = @PointID AND BookingStatus IN (N'Confirmed', N'Active'))
+            THROW 52007, 'Booking does not belong to user or point.', 1;
 
         DECLARE @PolicyID INT;
         SELECT TOP 1 @PolicyID = PolicyID
@@ -663,6 +865,14 @@ BEGIN
 
         IF @Status IS NULL
             THROW 52010, 'Charging session does not exist.', 1;
+        IF (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'Customer' OR IS_ROLEMEMBER(N'db_ev_customer') = 1)
+           AND NOT EXISTS (
+                SELECT 1
+                FROM Operations.ChargingSession
+                WHERE SessionID = @SessionID
+                  AND UserID = TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID'))
+           )
+            THROW 52013, 'Customer can only end own charging session.', 1;
         IF @Status <> N'Charging'
             THROW 52011, 'Charging session is not in Charging status.', 1;
 
@@ -771,6 +981,10 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
+        IF (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'Customer' OR IS_ROLEMEMBER(N'db_ev_customer') = 1)
+           AND ISNULL(@UserID, -1) <> ISNULL(TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID')), -2147483648)
+            THROW 53015, 'Customer can only create payment for current session user.', 1;
+
         DECLARE @Amount DECIMAL(19,4), @SessionUserID INT, @Status NVARCHAR(30);
         SELECT @Amount = CostTotal, @SessionUserID = UserID, @Status = SessionStatus
         FROM Operations.ChargingSession
@@ -875,6 +1089,10 @@ BEGIN
         SELECT @UserID = UserID, @Subtotal = CostBeforeTax, @Tax = TaxAmount, @Total = CostTotal
         FROM Operations.ChargingSession
         WHERE SessionID = @SessionID AND SessionStatus = N'Completed';
+
+        IF (COALESCE(CAST(SESSION_CONTEXT(N'RoleCode') AS NVARCHAR(40)), N'') = N'Customer' OR IS_ROLEMEMBER(N'db_ev_customer') = 1)
+           AND ISNULL(@UserID, -1) <> ISNULL(TRY_CONVERT(INT, SESSION_CONTEXT(N'UserID')), -2147483648)
+            THROW 53022, 'Customer can only create invoice for own charging session.', 1;
 
         SELECT TOP 1 @TransactionID = TransactionID
         FROM Payments.PaymentTransaction

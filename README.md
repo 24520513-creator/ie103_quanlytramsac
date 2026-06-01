@@ -1,31 +1,22 @@
-# EV Charging System - IE103 Database Project
+# EV Charging System - IE103
 
-Day la do an co trong tam la SQL Server/SSMS cho he thong quan ly mang tram sac xe dien va doi tac nhuong quyen.
+Đồ án quản lý trạm sạc điện dùng SQL Server làm trung tâm dữ liệu, nghiệp vụ, phân quyền và báo cáo. Website gồm hai lớp ứng dụng:
 
-Backend va frontend da duoc loai khoi source hien tai de tap trung vao phan database. Neu can phat trien ung dung sau nay, co the build lai tu dau dua tren schema, stored procedure, view va security script trong thu muc `database`.
+- `backend`: Node/Express, xác thực người dùng, gọi view/stored procedure đã whitelist trong catalog, luôn set `SESSION_CONTEXT`.
+- `frontend`: React/Vite, giao diện đăng nhập/đăng kí, dashboard theo vai trò, form, bảng dữ liệu, PDF/CSV và import JSON.
 
-## Thanh phan chinh
+## Cấu Trúc
 
-- DBMS: Microsoft SQL Server.
-- Database: `EV_Charging_System`.
-- Thu muc chinh: `database`.
-- Tai lieu phan tich: `DatabaseAnalysts.md`.
+- `database`: schema, bảng, function, stored procedure, trigger, view, security, seed data và script demo.
+- `backend`: API xác thực, catalog chức năng, gọi SQL Server, export PDF/CSV, import JSON.
+- `frontend`: giao diện người dùng, layout quản trị, dashboard, bảng dữ liệu và form động.
+- `docker-compose.yml`: đóng gói frontend/backend; SQL Server có thể dùng instance ngoài.
 
-## Schema
+## Database
 
-- `Core`: quoc gia, khu vuc, dia chi.
-- `Identity`: tai khoan, role, user-role.
-- `Infrastructure`: tram sac, cong sac, connector, telemetry.
-- `Franchise`: doi tac, hop dong, chinh sach chia doanh thu, settlement.
-- `Operations`: xe, booking, phien sac, chinh sach gia.
-- `Payments`: giao dich thanh toan, hoa don.
-- `Maintenance`: loi, ticket bao tri.
-- `AppView`: view va procedure phuc vu demo, bao cao.
-- `Audit`: audit log.
+Database mặc định: `EV_Charging_System`.
 
-## Thu tu chay script
-
-Chay trong SSMS theo thu tu:
+Chạy trong SSMS hoặc `sqlcmd` theo thứ tự:
 
 ```text
 database/00_Drop_And_Create_Database.sql
@@ -40,81 +31,130 @@ database/08_Create_Security.sql
 database/09_Seed_Demo_Data.sql
 ```
 
-Script bo sung:
+Script bổ sung:
 
-- `database/09_Advanced_Security.sql`: Dynamic Data Masking va cac ghi chu bao mat nang cao.
-- `database/12_Backup_Restore.sql`: mau backup/restore.
-- `database/features`: cac kich ban demo nghiep vu, phan quyen, bao cao va negative test.
-- `database/features/security/08_sql_authentication_logins.sql`: script tuy chon de tao SQL Authentication login that trong SSMS.
+- `database/09_Advanced_Security.sql`: masking và ghi chú bảo mật nâng cao.
+- `database/12_Backup_Restore.sql`: mẫu backup/restore.
+- `database/13_Auth_Migration.sql`: bổ sung bảng/procedure auth cho database đang có sẵn dữ liệu.
+- `database/features`: kịch bản demo nghiệp vụ, phân quyền và negative test.
+- `database/features/security/08_sql_authentication_logins.sql`: tạo SQL Authentication login demo cho backend.
 
-## Role demo
+## Phân Quyền Web
 
-- `SystemAdmin`
-- `OperationsStaff`
-- `BusinessManager`
-- `Customer`
-
-## Security core
-
-Phan quyen SQL Server nam trong `database/08_Create_Security.sql`. File nay chi tap trung vao phan bat buoc cua mon hoc:
-
-- `CREATE USER`
-- `CREATE ROLE`
-- role membership
-- `GRANT`
-- `DENY`
-- nguyen tac least privilege
-
-Mo hinh can trinh bay:
+Website dùng hai tầng:
 
 ```text
-Server Login -> Database User -> Database Role -> Permission
+SQL Server role/login -> kiểm soát vai trò được làm gì
+SESSION_CONTEXT(UserID, Username, RoleCode) -> lọc dữ liệu theo người dùng hiện tại
 ```
 
-Trong demo chinh, cac user duoc tao bang `CREATE USER ... WITHOUT LOGIN` de co the chay bang `EXECUTE AS USER` ngay trong SSMS ma khong phu thuoc cau hinh SQL Authentication cua may cham.
+Backend không nhận SQL tự do từ frontend. Mỗi API map tới action trong `backend/src/catalog.js`.
 
-## Ma tran quyen
+## Xác Thực
 
-| Database role | Vai tro nghiep vu | Quyen duoc cap | Quyen bi chan co chu dich |
-|---|---|---|---|
-| `db_ev_system_admin` | Quan tri he thong | Quan ly du lieu, user-role, cau hinh, audit; co `UNMASK` neu chay advanced security. | Khong dung `db_owner`/`sysadmin`; audit log van duoc trigger bao ve. |
-| `db_ev_operations_staff` | Nhan vien van hanh | Xem/cap nhat du lieu `Infrastructure`, `Operations`, `Maintenance`; goi procedure van hanh. | Khong doc `Identity`, khong doc/sua `Payments`. |
-| `db_ev_business_manager` | Quan ly kinh doanh | Xem view/procedure bao cao, doanh thu, KPI, franchise settlement. | Khong doc truc tiep schema `Payments`, khong sua `Infrastructure`, `Operations`, `Maintenance`, `Identity`. |
-| `db_ev_customer` | Khach hang | Xem view lich su/hoa don/cong sac kha dung; goi procedure xe, booking, phien sac, payment. | Khong doc truc tiep `Payments`, `Identity`. |
+Luồng auth hiện có:
 
-## Demo phan quyen trong SSMS
+- `POST /api/auth/register`: đăng kí công khai cho khách hàng.
+- `POST /api/auth/login`: đăng nhập bằng username, email hoặc số điện thoại.
+- `POST /api/auth/logout`: đăng xuất và xóa cookie phiên.
+- `GET /api/me`: lấy thông tin user hiện tại.
+- `POST /api/auth/forgot-password`: yêu cầu đặt lại mật khẩu.
+- `POST /api/auth/reset-password`: đặt lại mật khẩu bằng token.
+- `POST /api/auth/verify-email`: xác minh email nếu bật luồng token xác minh.
 
-Chay cac demo core sau khi setup database va seed data:
+Backend tự hash mật khẩu bằng `bcrypt`. Frontend không gửi SQL và không xử lý password hash.
 
-```text
-database/features/security/01_customer_permissions.sql
-database/features/security/02_operations_permissions.sql
-database/features/security/03_business_permissions.sql
-database/features/security/04_admin_permissions.sql
+## Tài Khoản Demo
+
+Mật khẩu demo: `password`.
+
+| Username | Vai trò |
+|---|---|
+| `customer01` | Khách hàng |
+| `operator01` | Nhân viên vận hành |
+| `business01` | Quản lý kinh doanh |
+| `franchise01` | Đối tác nhượng quyền |
+| `admin01` | Quản trị hệ thống |
+
+## Chạy Website
+
+Backend:
+
+```powershell
+cd backend
+copy .env.example .env
+npm install
+npm run dev
 ```
 
-Cac demo nay chung minh: moi role co mot truy van duoc phep va mot truy van bi chan bang permission denied.
+Frontend:
 
-`REVOKE` duoc giai thich nhu thao tac thu hoi quyen trong nhom DCL. Neu can demo them, co the them mot doan phu luc ngan cap tam quyen bang `GRANT`, thu hoi bang `REVOKE`, roi chay lai truy van de thay loi.
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-## Advanced Security
+URL mặc định:
 
-`database/09_Advanced_Security.sql` gom cac tinh nang nang cao, hien tai la Dynamic Data Masking cho `Email`, `Phone`, `PasswordHash`. Cac demo nang cao nam trong `database/features/security`:
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8000`
 
-- `05_masking_demo.sql`: Dynamic Data Masking.
-- `06_row_level_security_demo.sql`: Row-Level Security tam thoi.
-- `07_soft_delete_demo.sql`: soft delete.
-- `08_sql_authentication_logins.sql`: SQL Authentication login that.
+Docker Compose:
 
-Neu muon dang nhap SSMS bang SQL Authentication thay vi chi demo bang `EXECUTE AS USER`, chay them `database/features/security/08_sql_authentication_logins.sql` sau khi da chay `08_Create_Security.sql`. Script nay can tai khoan co quyen `CREATE LOGIN`.
+```powershell
+docker compose up --build
+```
 
-## Pham vi do an
+## Biến Môi Trường Backend
 
-Source hien tai uu tien:
+Các biến auth chính nằm trong `backend/.env.example`:
 
-- Thiet ke CSDL, schema, rang buoc, index.
-- Stored procedure cho cac nghiep vu chinh.
-- Trigger va audit log.
-- View/procedure bao cao.
-- Seed data phuc vu demo.
-- Demo phan quyen va kiem thu tinh huong sai.
+- `FRONTEND_URL=http://localhost:3000`
+- `AUTH_COOKIE_NAME=ev_session`
+- `ACCESS_TOKEN_TTL=8h`
+- `AUTH_COOKIE_MAX_AGE_MS=28800000`
+- `RESET_TOKEN_MINUTES=30`
+- `LOG_RESET_TOKENS=true`
+
+Khi `LOG_RESET_TOKENS=true`, backend in reset token ra log để kiểm thử local/dev.
+
+## Kiểm Thử Nhanh
+
+Build frontend:
+
+```powershell
+cd frontend
+npm run build
+```
+
+Smoke test backend sau khi backend đang chạy:
+
+```powershell
+cd backend
+npm run smoke
+```
+
+Smoke test kiểm tra:
+
+- đăng nhập đủ 5 role demo;
+- `/api/me`;
+- dashboard chính từng role;
+- customer bị chặn khi gọi action admin;
+- export PDF/CSV cho báo cáo.
+
+## Phạm Vi Website
+
+Đã bám theo database hiện có:
+
+- Customer: xe, cổng khả dụng, booking, phiên sạc, payment, invoice.
+- Operations Staff: trạng thái trạm/cổng, phiên đang sạc, lỗi thiết bị, ticket, telemetry.
+- Business Manager: pricing policy, báo cáo doanh thu/KPI, settlement, profit sharing, refund.
+- Franchise Partner: hồ sơ, hợp đồng, trạm, revenue share policy, settlement của chính mình.
+- System Admin: user, role, khóa/mở khóa, reset password, audit log, hướng dẫn backup/restore.
+
+Export/import:
+
+- PDF cho các báo cáo có ngày xuất, người lập, vai trò và ký xác nhận.
+- CSV cho màn hình đọc dữ liệu và báo cáo.
+- Import JSON chỉ bật cho procedure được whitelist, không cho gửi SQL tùy ý.
