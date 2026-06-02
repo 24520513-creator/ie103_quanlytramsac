@@ -16,7 +16,7 @@ SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
 -- >>> SUA DUONG DAN NAY CHO DUNG MAY CUA BAN <<<
-DECLARE @DataDir NVARCHAR(4000) = N'C:\Users\hocvi\OneDrive\Documents\Study\IE103_QuanLyThongTin\SourceCode\database\SeedData';
+DECLARE @DataDir NVARCHAR(4000) = N'...IE103_QuanLyThongTin\SourceCode\database\SeedData';
 DECLARE @sql NVARCHAR(MAX);
 
 IF EXISTS (SELECT 1 FROM Operations.ChargingSession)
