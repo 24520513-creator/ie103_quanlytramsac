@@ -1,0 +1,41 @@
+RegionID,RegionCode,RegionName,TimeZone,IsActive
+1,"HCM","TP Ho Chi Minh","Asia/Ho_Chi_Minh",1
+2,"HN","Ha Noi","Asia/Ho_Chi_Minh",1
+3,"DNG","Da Nang","Asia/Ho_Chi_Minh",1
+4,"BD","Binh Duong","Asia/Ho_Chi_Minh",1
+5,"HP","Hai Phong","Asia/Ho_Chi_Minh",1
+6,"DN","Dong Nai","Asia/Ho_Chi_Minh",1
+7,"CT","Can Tho","Asia/Ho_Chi_Minh",1
+8,"BRVT","Ba Ria - Vung Tau","Asia/Ho_Chi_Minh",1
+9,"KH","Khanh Hoa","Asia/Ho_Chi_Minh",1
+10,"QNI","Quang Ninh","Asia/Ho_Chi_Minh",1
+11,"LD","Lam Dong","Asia/Ho_Chi_Minh",1
+12,"NA","Nghe An","Asia/Ho_Chi_Minh",1
+13,"TH","Thanh Hoa","Asia/Ho_Chi_Minh",1
+14,"TTH","Thua Thien Hue","Asia/Ho_Chi_Minh",1
+15,"BN","Bac Ninh","Asia/Ho_Chi_Minh",1
+16,"HD","Hai Duong","Asia/Ho_Chi_Minh",1
+17,"LA","Long An","Asia/Ho_Chi_Minh",1
+18,"TG","Tien Giang","Asia/Ho_Chi_Minh",1
+19,"VP","Vinh Phuc","Asia/Ho_Chi_Minh",1
+20,"AG","An Giang","Asia/Ho_Chi_Minh",1
+21,"KG","Kien Giang","Asia/Ho_Chi_Minh",1
+22,"QNM","Quang Nam","Asia/Ho_Chi_Minh",1
+23,"QT","Quang Tri","Asia/Ho_Chi_Minh",1
+24,"BTH","Binh Thuan","Asia/Ho_Chi_Minh",1
+25,"GL","Gia Lai","Asia/Ho_Chi_Minh",1
+26,"DLK","Dak Lak","Asia/Ho_Chi_Minh",1
+27,"TN","Tay Ninh","Asia/Ho_Chi_Minh",1
+28,"HNM","Ha Nam","Asia/Ho_Chi_Minh",1
+29,"NB","Ninh Binh","Asia/Ho_Chi_Minh",1
+30,"TB","Thai Binh","Asia/Ho_Chi_Minh",1
+31,"PT","Phu Tho","Asia/Ho_Chi_Minh",1
+32,"BG","Bac Giang","Asia/Ho_Chi_Minh",1
+33,"LCI","Lao Cai","Asia/Ho_Chi_Minh",1
+34,"HG","Ha Giang","Asia/Ho_Chi_Minh",1
+35,"SL","Son La","Asia/Ho_Chi_Minh",1
+36,"DB","Dien Bien","Asia/Ho_Chi_Minh",1
+37,"LCH","Lai Chau","Asia/Ho_Chi_Minh",1
+38,"CB","Cao Bang","Asia/Ho_Chi_Minh",1
+39,"BK","Bac Kan","Asia/Ho_Chi_Minh",1
+40,"KT","Kon Tum","Asia/Ho_Chi_Minh",1

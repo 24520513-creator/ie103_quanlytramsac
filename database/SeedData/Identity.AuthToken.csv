@@ -1,0 +1,2 @@
+AuthTokenID,UserID,TokenType,TokenHash,ExpiresAt,ConsumedAt,CreatedAt
+1,553,"PasswordReset","TOKENHASH_DEMO_0001","2026-06-02T08:52:00.9187124",,"2026-06-02T15:22:01.0585496"

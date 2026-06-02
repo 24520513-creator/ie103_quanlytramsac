@@ -1,0 +1,5 @@
+ConnectorTypeID,ConnectorCode,ConnectorName,MaxPowerKW,IsActive
+1,"CCS2","Combined Charging System Type 2",350.00,1
+2,"CHAdeMO","CHAdeMO DC",100.00,1
+3,"Type2","AC Type 2",43.00,1
+4,"GBT","GB/T DC",180.00,1

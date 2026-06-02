@@ -1,0 +1,6 @@
+RoleID,RoleCode,RoleName,Description,IsSystemRole
+1,"SystemAdmin","System administrator","Full database administration role",1
+2,"OperationsStaff","Operations staff","Operates stations, charging points, sessions, errors, and tickets",1
+3,"BusinessManager","Business manager","Views revenue, manages pricing, franchise settlement, and KPI datasets",1
+4,"FranchisePartner","Franchise partner","Reads own franchise profile, contracts, stations, policies, and settlements",1
+5,"Customer","Customer","Owns vehicles, books charging, starts sessions, pays, and views history",1

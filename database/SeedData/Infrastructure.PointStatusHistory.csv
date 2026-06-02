@@ -1,0 +1,13 @@
+PointStatusHistoryID,PointID,OldStatus,NewStatus,ChangedBy,ChangedAt
+1,1,"Available","Offline",,"2026-06-02T16:03:33.8428683"
+2,1,"Offline","Available",,"2026-06-02T16:03:33.8575938"
+3,1,"Available","Charging",,"2026-06-02T16:13:12.5630612"
+4,1,"Charging","Available",,"2026-06-02T16:13:12.6420189"
+5,1,"Available","Charging",,"2026-06-02T16:18:27.6854292"
+6,1,"Charging","Available",,"2026-06-02T16:18:27.7470964"
+7,1,"Available","Charging",,"2026-06-02T16:20:00.4415616"
+8,1,"Charging","Available",,"2026-06-02T16:20:00.5918043"
+9,1,"Available","Charging",,"2026-06-02T16:50:38.7029750"
+10,1,"Charging","Available",,"2026-06-02T16:50:38.7731872"
+11,1,"Available","Charging",,"2026-06-02T16:51:40.5568295"
+12,1,"Charging","Available",,"2026-06-02T16:51:40.7167556"
