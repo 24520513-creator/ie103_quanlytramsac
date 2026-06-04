@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useActionData } from '../../lib/useAction';
 import { formatNumber, formatDate } from '../../lib/format';
-import { DashboardStats, ActionModal, ConfirmAction, ReportView, QuickReports } from '../common';
+import { DashboardStats, DashboardHeader, TrendPanel, ActionModal, ConfirmAction, ReportView, QuickReports } from '../common';
 import { Bars } from '../../components/charts';
 import {
   Card, CardHeader, PageHeader, Button, Badge, EmptyState, Loader, SearchInput, Tabs
@@ -13,7 +13,10 @@ import {
 
 /* ------------------------------- Dashboard ------------------------------- */
 export function OpsDashboard({ ctx, h }) {
-  const { rows } = useActionData('stationStatus', { token: ctx.token, body: { pageSize: 12 } });
+  const [range, setRange] = useState({});
+  const body = useMemo(() => ({ ...range }), [range]);
+  const trend = useActionData('sessionTrend', { token: ctx.token, body: { ...body, pageSize: 5000 }, auto: h.has('sessionTrend') });
+  const { rows } = useActionData('stationStatus', { token: ctx.token, body: { ...body, pageSize: 12 } });
   const chartData = rows.slice(0, 8).map((r) => ({
     name: r.StationCode || r.StationName,
     'Khả dụng': Number(r.AvailablePoints) || 0,
@@ -22,8 +25,21 @@ export function OpsDashboard({ ctx, h }) {
   }));
   return (
     <div className="ui-stack">
-      <PageHeader icon={<OperationsIcon size={22} />} title="Tổng quan vận hành" subtitle="Tình trạng trạm, cổng, phiên đang sạc và ticket bảo trì." />
-      <DashboardStats actionId="operationsDashboard" token={ctx.token} accents={['brand', 'info', 'bad', 'warn']} />
+      <DashboardHeader icon={<OperationsIcon size={22} />} title="Tổng quan vận hành" subtitle="Tình trạng trạm, cổng, phiên đang sạc và ticket bảo trì." range={range} onRangeChange={setRange} onToast={ctx.onToast} />
+      <DashboardStats actionId="operationsDashboard" token={ctx.token} accents={['brand', 'info', 'bad', 'warn']} range={range} />
+      {h.has('sessionTrend') && (
+        <TrendPanel
+          title="Lưu lượng phiên sạc"
+          subtitle="Số phiên sạc theo khoảng thời gian đã chọn"
+          rows={trend.rows}
+          loading={trend.loading}
+          dateKey="SessionDate"
+          valueKey="SessionCount"
+          range={range}
+          color="#06b6d4"
+          height={300}
+        />
+      )}
       {chartData.length > 0 && (
         <Card>
           <CardHeader title="Tình trạng cổng theo trạm" subtitle="Top trạm" />

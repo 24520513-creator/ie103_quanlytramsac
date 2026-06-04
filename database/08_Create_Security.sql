@@ -171,7 +171,9 @@ GRANT SELECT ON OBJECT::AppView.vw_ChargingSessionStatistics TO db_ev_business_m
 GRANT SELECT ON OBJECT::AppView.vw_TopCustomerUsage TO db_ev_business_manager;
 GRANT SELECT ON OBJECT::AppView.vw_PricingPolicies TO db_ev_business_manager;
 GRANT SELECT ON OBJECT::AppView.vw_RefundablePayments TO db_ev_business_manager;
+GRANT SELECT ON OBJECT::AppView.vw_ConnectorUtilization TO db_ev_business_manager;
 GRANT EXECUTE ON OBJECT::AppView.sp_GetCurrentUserProfile TO db_ev_business_manager;
+GRANT EXECUTE ON OBJECT::AppView.sp_GetTelemetryHealth TO db_ev_business_manager;
 GRANT EXECUTE ON OBJECT::Operations.sp_CreatePricingPolicy TO db_ev_business_manager;
 GRANT EXECUTE ON OBJECT::Operations.sp_DeactivatePricingPolicy TO db_ev_business_manager;
 GRANT EXECUTE ON OBJECT::Payments.sp_RefundPayment TO db_ev_business_manager;

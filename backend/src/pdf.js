@@ -93,6 +93,9 @@ function formatCell(value, column = '') {
   if (value === null || value === undefined) return '';
   if (value instanceof Date) return formatDate(value);
   if (typeof value === 'number') {
+    // Year/month/ID columns are ordinals, not quantities: no currency symbol and no
+    // thousands grouping (otherwise the year 2026 renders as "2.026 đ" / "2.026").
+    if (/(year|month)$|id$/i.test(column)) return String(value);
     if (/amount|revenue|spend|price|cost|totalrevenue|share/i.test(column)) return formatCurrency(value);
     if (/rate|percent/i.test(column)) return formatPercent(value);
     return formatNumber(value, Number.isInteger(value) ? 0 : 2);
@@ -217,10 +220,19 @@ function ensureSpace(doc, height) {
   if (doc.y + height > PAGE.height - PAGE.margin - 28) doc.addPage();
 }
 
+function capitalize(text) {
+  const str = String(text ?? '');
+  return str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
+}
+
 function drawSectionTitle(doc, title) {
   ensureSpace(doc, 34);
   doc.moveDown(0.8);
-  font(doc, 'bold').fontSize(12).fillColor(COLORS.ink).text(title);
+  // Anchor at the left margin with an explicit x: PDFKit otherwise inherits doc.x
+  // from the previous block (a KPI card / chart cell), pushing titles off to the right.
+  const y = doc.y;
+  doc.roundedRect(PAGE.margin, y + 1, 3, 13, 1.5).fill(COLORS.brand);
+  font(doc, 'bold').fontSize(12).fillColor(COLORS.ink).text(title, PAGE.margin + 10, y, { width: PAGE.contentWidth - 10, align: 'left' });
   doc.moveTo(PAGE.margin, doc.y + 4).lineTo(PAGE.width - PAGE.margin, doc.y + 4).strokeColor(COLORS.line).lineWidth(1).stroke();
   doc.moveDown(0.8);
 }
@@ -445,7 +457,7 @@ function renderInsights(doc, rows, template) {
   doc.roundedRect(PAGE.margin, y, PAGE.contentWidth, height, 5).fill(COLORS.soft).strokeColor(COLORS.line).stroke();
   insights.forEach((item, index) => {
     doc.circle(PAGE.margin + 16, y + 18 + index * 18, 3).fill(PALETTE[index % PALETTE.length]);
-    font(doc).fontSize(9).fillColor(COLORS.ink).text(item, PAGE.margin + 28, y + 12 + index * 18, { width: PAGE.contentWidth - 42 });
+    font(doc).fontSize(9).fillColor(COLORS.ink).text(capitalize(item), PAGE.margin + 28, y + 12 + index * 18, { width: PAGE.contentWidth - 42 });
   });
   doc.y = y + height + 4;
 }
@@ -550,20 +562,7 @@ function renderFooters(doc) {
   }
 }
 
-export async function buildReportPdf(actionId, user, body = {}) {
-  const action = actions[actionId];
-  if (!action?.report) {
-    const error = new Error('Chức năng này không phải báo cáo có thể xuất PDF.');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const data = await runAction(actionId, user, { ...body, pageSize: body.pageSize || 80 });
-  const rows = data.rows || [];
-  const columns = (action.columns?.length ? action.columns : data.columns || []).filter(Boolean).slice(0, MAX_TABLE_COLUMNS);
-  const template = getReportTemplate(actionId);
-  const issuedAt = new Date();
-
+export function renderReportPdf({ action, rows, columns, template, user, body = {}, issuedAt = new Date() }) {
   const doc = new PDFDocument({ margin: PAGE.margin, size: 'A4', bufferPages: true, info: { Title: action.title, Author: user.fullName || user.username } });
   registerVietnameseFonts(doc);
   const chunks = [];
@@ -583,4 +582,19 @@ export async function buildReportPdf(actionId, user, body = {}) {
   return new Promise((resolve) => {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
   });
+}
+
+export async function buildReportPdf(actionId, user, body = {}) {
+  const action = actions[actionId];
+  if (!action?.report) {
+    const error = new Error('Chức năng này không phải báo cáo có thể xuất PDF.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const data = await runAction(actionId, user, { ...body, pageSize: body.pageSize || 80 });
+  const rows = data.rows || [];
+  const columns = (action.columns?.length ? action.columns : data.columns || []).filter(Boolean).slice(0, MAX_TABLE_COLUMNS);
+  const template = getReportTemplate(actionId);
+  return renderReportPdf({ action, rows, columns, template, user, body });
 }

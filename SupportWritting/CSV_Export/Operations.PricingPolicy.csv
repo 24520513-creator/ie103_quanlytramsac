@@ -1,0 +1,7 @@
+﻿"PolicyID","PolicyCode","PolicyName","BasePricePerKWh","PeakMultiplier","PeakStartHour","PeakEndHour","AppliedFrom","AppliedTo","IsActive"
+"1","STD-2024","Standard price (year 1)","3500.0000","1.25","17:00:00","20:00:00","6/1/2024 12:00:00 AM","6/1/2025 12:00:00 AM","False"
+"2","NIGHT-2024","Night price (year 1)","2800.0000","1.00","","","6/1/2024 12:00:00 AM","6/1/2025 12:00:00 AM","False"
+"3","FAST-2024","Fast charging (year 1)","4300.0000","1.35","16:00:00","21:00:00","6/1/2024 12:00:00 AM","6/1/2025 12:00:00 AM","False"
+"4","STD-2025","Standard price (year 2)","3900.0000","1.25","17:00:00","20:00:00","6/1/2025 12:00:00 AM","","True"
+"5","NIGHT-2025","Night price (year 2)","3100.0000","1.00","","","6/1/2025 12:00:00 AM","","True"
+"6","FAST-2025","Fast charging (year 2)","4800.0000","1.35","16:00:00","21:00:00","6/1/2025 12:00:00 AM","","True"

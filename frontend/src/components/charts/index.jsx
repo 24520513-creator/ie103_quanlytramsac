@@ -50,17 +50,25 @@ export function Bars({ data, xKey, yKeys = [], height = 260, horizontal = false 
     <ResponsiveContainer width="100%" height={height}>
       <ReBarChart data={data} layout={horizontal ? 'vertical' : 'horizontal'} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={!horizontal} horizontal={horizontal} />
-        {horizontal ? (
-          <>
-            <XAxis type="number" tickFormatter={shorten} tick={axisStyle} tickLine={false} axisLine={false} />
-            <YAxis type="category" dataKey={xKey} tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStroke }} width={120} />
-          </>
-        ) : (
-          <>
-            <XAxis dataKey={xKey} tick={axisStyle} tickLine={false} axisLine={{ stroke: gridStroke }} />
-            <YAxis tickFormatter={shorten} tick={axisStyle} tickLine={false} axisLine={false} width={44} />
-          </>
-        )}
+        {/* Axes must be DIRECT children of the chart — recharts does not discover
+            them inside a React fragment, so keep them flat and switch via props. */}
+        <XAxis
+          type={horizontal ? 'number' : 'category'}
+          dataKey={horizontal ? undefined : xKey}
+          tickFormatter={horizontal ? shorten : undefined}
+          tick={axisStyle}
+          tickLine={false}
+          axisLine={horizontal ? false : { stroke: gridStroke }}
+        />
+        <YAxis
+          type={horizontal ? 'category' : 'number'}
+          dataKey={horizontal ? xKey : undefined}
+          tickFormatter={horizontal ? undefined : shorten}
+          tick={axisStyle}
+          tickLine={false}
+          axisLine={horizontal ? { stroke: gridStroke } : false}
+          width={horizontal ? 120 : 44}
+        />
         <Tooltip contentStyle={tooltipStyle} formatter={(v) => new Intl.NumberFormat('vi-VN').format(v)} cursor={{ fill: 'rgba(16,185,129,0.06)' }} />
         {keys.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
         {keys.map((k, i) => (

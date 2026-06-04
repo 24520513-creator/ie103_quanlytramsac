@@ -1,7 +1,7 @@
 import sql from 'mssql';
 import { actions } from './catalog.js';
 import { hashPassword } from './auth.js';
-import { normalizeRecordset, sqlTypes, withSession } from './db.js';
+import { authQuery, normalizeRecordset, sqlTypes, withSession } from './db.js';
 import { validateActionLookups } from './lookups.js';
 
 const maxPageSize = 5000;
@@ -152,6 +152,21 @@ export async function runAction(actionId, user, body = {}) {
   }
 
   const preparedBody = await prepareBody(actionId, body);
+  if (action.useAuthConnection && action.kind === 'query') {
+    const result = await authQuery(async (pool) => {
+      const request = pool.request();
+      bindInputs(request, action, preparedBody, user);
+      if (action.paginated || body.page || body.pageSize) {
+        return request.query(buildPagedQuery(action, preparedBody, request));
+      }
+      if (action.dateFilter || body.search) {
+        return request.query(buildFilteredQuery(action, preparedBody, request));
+      }
+      return request.query(action.sql);
+    });
+    return normalizeResult(result, action, preparedBody);
+  }
+
   const result = await withSession(user, async (transaction) => {
     await validateActionLookups(action, user, preparedBody, transaction);
     const request = new sql.Request(transaction);

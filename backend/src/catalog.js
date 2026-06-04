@@ -300,6 +300,28 @@ export const actions = {
     columns: ['StationID', 'StationCode', 'StationName', 'StationStatus', 'TotalPoints', 'AvailablePoints', 'ChargingPoints', 'ProblemPoints']
   }),
 
+  sessionTrend: queryAction({
+    title: 'Xu hướng phiên sạc',
+    description: 'Số phiên sạc theo ngày, phân tách hoàn tất và lỗi — dùng cho biểu đồ tổng quan.',
+    group: 'reports',
+    roles: ['OperationsStaff', 'BusinessManager'],
+    sql: `
+      SELECT SessionDate,
+             SUM(SessionCount) AS SessionCount,
+             SUM(CASE WHEN SessionStatus = N'Completed' THEN SessionCount ELSE 0 END) AS CompletedSessions,
+             SUM(CASE WHEN SessionStatus = N'Failed' THEN SessionCount ELSE 0 END) AS FailedSessions,
+             SUM(RevenueTotal) AS RevenueTotal
+      FROM AppView.vw_ChargingSessionStatistics
+      WHERE (@FromDate IS NULL OR SessionDate >= @FromDate)
+        AND (@ToDate IS NULL OR SessionDate < DATEADD(DAY, 1, @ToDate))
+      GROUP BY SessionDate
+    `,
+    orderBy: 'SessionDate',
+    searchColumns: [],
+    params: dateRangeParams,
+    columns: ['SessionDate', 'SessionCount', 'CompletedSessions', 'FailedSessions', 'RevenueTotal']
+  }),
+
   updateStationStatus: procedureAction({
     title: 'Cập nhật trạng thái trạm',
     description: 'Đổi trạng thái vận hành của trạm.',
@@ -529,6 +551,48 @@ export const actions = {
     report: true
   }),
 
+  stationRevenueMap: queryAction({
+    title: 'Bản đồ doanh thu trạm',
+    description: 'Tọa độ các trạm trên bản đồ Việt Nam kèm doanh thu theo khoảng ngày.',
+    group: 'reports',
+    roles: ['BusinessManager'],
+    params: dateRangeParams,
+    useAuthConnection: true,
+    sql: `
+      SELECT
+        s.StationID,
+        s.StationCode,
+        s.StationName,
+        s.StationStatus,
+        r.RegionName,
+        CONVERT(FLOAT, a.Latitude) AS Latitude,
+        CONVERT(FLOAT, a.Longitude) AS Longitude,
+        COALESCE(rv.CompletedSessions, 0) AS CompletedSessions,
+        COALESCE(rv.TotalKWh, 0) AS TotalKWh,
+        COALESCE(rv.RevenueTotal, 0) AS RevenueTotal
+      FROM Infrastructure.ChargingStation s
+      JOIN Core.Address a ON a.AddressID = s.AddressID
+      LEFT JOIN Core.Region r ON r.RegionID = a.RegionID
+      LEFT JOIN (
+        SELECT
+          StationID,
+          SUM(CompletedSessions) AS CompletedSessions,
+          SUM(TotalKWh) AS TotalKWh,
+          SUM(RevenueTotal) AS RevenueTotal
+        FROM AppView.vw_StationRevenueDaily
+        WHERE (@FromDate IS NULL OR RevenueDate >= @FromDate)
+          AND (@ToDate IS NULL OR RevenueDate < DATEADD(DAY, 1, @ToDate))
+        GROUP BY StationID
+      ) rv ON rv.StationID = s.StationID
+      WHERE s.StationStatus <> N'Retired'
+        AND a.Latitude IS NOT NULL
+        AND a.Longitude IS NOT NULL
+    `,
+    orderBy: 'RevenueTotal DESC, StationCode',
+    searchColumns: ['StationCode', 'StationName', 'RegionName'],
+    columns: ['StationCode', 'StationName', 'StationStatus', 'RegionName', 'Latitude', 'Longitude', 'CompletedSessions', 'TotalKWh', 'RevenueTotal']
+  }),
+
   regionRevenue: queryAction({
     title: 'Doanh thu theo khu vực',
     description: 'Tổng hợp doanh thu theo khu vực.',
@@ -715,6 +779,25 @@ export const actions = {
     columns: ['RoleCode', 'AccountStatus', 'AccountCount']
   }),
 
+  accountActivityTrend: queryAction({
+    title: 'Xu hướng tài khoản mới',
+    description: 'Số tài khoản tạo mới theo ngày — dùng cho biểu đồ tổng quan.',
+    group: 'reports',
+    roles: ['SystemAdmin'],
+    sql: `
+      SELECT CAST(CreatedAt AS DATE) AS ActivityDate,
+             COUNT(*) AS NewAccounts
+      FROM [Identity].UserAccount
+      WHERE (@FromDate IS NULL OR CreatedAt >= @FromDate)
+        AND (@ToDate IS NULL OR CreatedAt < DATEADD(DAY, 1, @ToDate))
+      GROUP BY CAST(CreatedAt AS DATE)
+    `,
+    orderBy: 'ActivityDate',
+    searchColumns: [],
+    params: dateRangeParams,
+    columns: ['ActivityDate', 'NewAccounts']
+  }),
+
   myChargingSummary: queryAction({
     title: 'Tổng hợp sạc theo tháng',
     description: 'Sản lượng và chi tiêu sạc của bạn theo từng tháng.',
@@ -725,6 +808,28 @@ export const actions = {
     searchColumns: ['UsageYear', 'UsageMonth'],
     report: true,
     columns: ['UsageYear', 'UsageMonth', 'SessionCount', 'TotalKWh', 'TotalSpend']
+  }),
+
+  customerSpendTrend: queryAction({
+    title: 'Xu hướng chi tiêu sạc',
+    description: 'Chi tiêu và sản lượng sạc của bạn theo ngày — dùng cho biểu đồ tổng quan.',
+    group: 'reports',
+    roles: ['Customer'],
+    sql: `
+      SELECT CAST(StartTime AS DATE) AS SpendDate,
+             COUNT(*) AS SessionCount,
+             SUM(ISNULL(TotalKWh, 0)) AS TotalKWh,
+             SUM(ISNULL(CostTotal, 0)) AS TotalSpend
+      FROM AppView.vw_CustomerChargingHistory
+      WHERE SessionStatus = N'Completed'
+        AND (@FromDate IS NULL OR StartTime >= @FromDate)
+        AND (@ToDate IS NULL OR StartTime < DATEADD(DAY, 1, @ToDate))
+      GROUP BY CAST(StartTime AS DATE)
+    `,
+    orderBy: 'SpendDate',
+    searchColumns: [],
+    params: dateRangeParams,
+    columns: ['SpendDate', 'SessionCount', 'TotalKWh', 'TotalSpend']
   }),
 
   profitSharing: procedureAction({

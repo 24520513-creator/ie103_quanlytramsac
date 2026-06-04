@@ -2,10 +2,10 @@ import React, { useMemo, useState } from 'react';
 import { useActionData } from '../lib/useAction';
 import { runAction, downloadReportPdf, downloadCsv } from '../lib/api';
 import { formatValue, formatNumber, isStatusColumn } from '../lib/format';
-import { Modal, Loader, EmptyState, StatTile, Badge, DataTable, Button, Card, CardHeader } from '../components/ui';
+import { Modal, Loader, EmptyState, StatTile, Badge, DataTable, Button, Card, CardHeader, PageHeader } from '../components/ui';
 import { ActionForm } from '../components/ui/ActionForm';
 import { friendlyError } from '../lib/errors';
-import { BoltIcon, TrendingUpIcon, ActivityIcon, CheckIcon, DownloadIcon } from '../components/Icons';
+import { BoltIcon, TrendingUpIcon, ActivityIcon, CheckIcon, DownloadIcon, CalendarIcon, CameraIcon } from '../components/Icons';
 import { Bars, AreaTrend, Donut } from '../components/charts';
 import { SQL_HINTS } from '../lib/sqlHints';
 
@@ -255,7 +255,7 @@ function ReportBrief({ action, rows, columns }) {
   );
 }
 
-function DateRangeControls({ value, onChange, compact = false }) {
+export function DateRangeControls({ value, onChange, compact = false }) {
   const [preset, setPreset] = useState('all');
 
   function applyPreset(nextPreset) {
@@ -270,52 +270,183 @@ function DateRangeControls({ value, onChange, compact = false }) {
     onChange({ ...value, [key]: nextValue || undefined });
   }
 
+  // Only the "Tùy chỉnh" preset exposes the raw date inputs — keeps the timeframe
+  // picker compact (a single dropdown) for the dashboards, like a stat console.
+  const showDates = preset === 'custom';
+
   return (
     <div className={`date-range-controls${compact ? ' date-range-controls-compact' : ''}`}>
+      <span className="date-range-icon" aria-hidden="true"><CalendarIcon size={15} /></span>
       <select value={preset} onChange={(event) => applyPreset(event.target.value)} aria-label="Khoảng thời gian">
         {RANGE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
       </select>
-      <input type="date" value={value.FromDate || ''} onChange={(event) => updateCustom('FromDate', event.target.value)} aria-label="Từ ngày" />
-      <input type="date" value={value.ToDate || ''} onChange={(event) => updateCustom('ToDate', event.target.value)} aria-label="Đến ngày" />
+      {showDates && <input type="date" value={value.FromDate || ''} onChange={(event) => updateCustom('FromDate', event.target.value)} aria-label="Từ ngày" />}
+      {showDates && <input type="date" value={value.ToDate || ''} onChange={(event) => updateCustom('ToDate', event.target.value)} aria-label="Đến ngày" />}
     </div>
   );
 }
 
-/** Renders KPI tiles from a dashboard action returning ChiSo/GiaTri/DonVi rows. */
-export function DashboardStats({ actionId, token, accents, onRangeChange }) {
-  const [range, setRange] = useState({});
+/**
+ * Captures the whole dashboard (the nearest `.ui-stack` ancestor) to a PNG and
+ * downloads it. Uses html2canvas, loaded on demand so it never weighs down the
+ * initial bundle. The button itself is excluded from the capture.
+ */
+export function ScreenshotButton({ onToast, label = 'Chụp màn hình', className = '' }) {
+  const [busy, setBusy] = useState(false);
+
+  async function capture(event) {
+    const root = event.currentTarget.closest('.ui-stack');
+    if (!root) return;
+    setBusy(true);
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const bg = getComputedStyle(document.body).backgroundColor || '#ffffff';
+      const canvas = await html2canvas(root, {
+        backgroundColor: bg && bg !== 'rgba(0, 0, 0, 0)' ? bg : '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        scrollX: 0,
+        scrollY: -window.scrollY,
+        windowWidth: root.scrollWidth
+      });
+      const link = document.createElement('a');
+      link.download = `dashboard-${new Date().toISOString().slice(0, 10)}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      onToast?.('Đã tải ảnh dashboard.', 'success');
+    } catch (err) {
+      onToast?.('Không chụp được màn hình. Vui lòng thử lại.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      className={className}
+      icon={<CameraIcon size={16} />}
+      onClick={capture}
+      disabled={busy}
+      data-html2canvas-ignore="true"
+    >
+      {busy ? 'Đang chụp...' : label}
+    </Button>
+  );
+}
+
+/**
+ * Dashboard header: title + a single timeframe picker on the right (stat-console
+ * style). The picker is the one control that governs both the KPI tiles and every
+ * chart on the dashboard — the parent owns `range` and feeds it to all of them.
+ */
+export function DashboardHeader({ icon, title, subtitle, range, onRangeChange, actions, onToast }) {
+  return (
+    <PageHeader
+      icon={icon}
+      title={title}
+      subtitle={subtitle}
+      actions={(
+        <div className="dash-header-tools">
+          <DateRangeControls value={range} onChange={onRangeChange} compact />
+          <ScreenshotButton onToast={onToast} />
+          {actions}
+        </div>
+      )}
+    />
+  );
+}
+
+/** Renders KPI tiles from a dashboard action returning ChiSo/GiaTri/DonVi rows.
+ *  Controlled: `range` is owned by the parent dashboard (shared with the charts). */
+export function DashboardStats({ actionId, token, accents, range = {} }) {
   const requestBody = useMemo(() => ({ ...range }), [range]);
   const { rows, loading } = useActionData(actionId, { token, body: requestBody });
-  function changeRange(nextRange) {
-    setRange(nextRange);
-    onRangeChange?.(nextRange);
-  }
   if (loading) return <Loader />;
   if (!rows.length) return <EmptyState title="Chưa có số liệu" message="Dữ liệu tổng quan sẽ hiển thị tại đây." />;
   return (
-    <div className="ui-stack">
-      <div className="ui-toolbar date-range-toolbar">
-        <DateRangeControls value={range} onChange={changeRange} compact />
-      </div>
-      <div className="ui-grid ui-grid-stats">
-        {rows.map((row, i) => {
-          const keys = Object.keys(row);
-          const label = row.ChiSo ?? row[keys[0]];
-          const value = row.GiaTri ?? row[keys[1]];
-          const unit = row.DonVi ?? row[keys[2]] ?? '';
-          return (
-            <StatTile
-              key={i}
-              icon={STAT_ICONS[i % STAT_ICONS.length]}
-              label={label}
-              value={formatValue(value)}
-              unit={unit}
-              accent={(accents && accents[i]) || ACCENTS[i % ACCENTS.length]}
-            />
-          );
-        })}
-      </div>
+    <div className="ui-grid ui-grid-stats">
+      {rows.map((row, i) => {
+        const keys = Object.keys(row);
+        const label = row.ChiSo ?? row[keys[0]];
+        const value = row.GiaTri ?? row[keys[1]];
+        const unit = row.DonVi ?? row[keys[2]] ?? '';
+        return (
+          <StatTile
+            key={i}
+            icon={STAT_ICONS[i % STAT_ICONS.length]}
+            label={label}
+            value={formatValue(value)}
+            unit={unit}
+            accent={(accents && accents[i]) || ACCENTS[i % ACCENTS.length]}
+          />
+        );
+      })}
     </div>
+  );
+}
+
+/**
+ * Buckets daily-grained rows (each with a real date column) into day/week/month/
+ * quarter buckets according to the selected range — so the chart's time axis
+ * granularity follows the timeframe picker. Returns rows shaped { label, sort, ...sums }.
+ */
+export function bucketSeries(rows, dateKey, valueKeys, range = {}) {
+  const keys = Array.isArray(valueKeys) ? valueKeys : [valueKeys];
+  if (!rows?.length) return [];
+  const bucket = bucketForRange(range, rows, dateKey);
+  const map = new Map();
+  rows.forEach((row) => {
+    const date = parseDate(row[dateKey]);
+    if (!date) return;
+    const b = bucketKey(date, bucket);
+    const current = map.get(b.key) || { label: b.label, sort: b.sort };
+    keys.forEach((key) => { current[key] = (current[key] || 0) + num(row[key]); });
+    map.set(b.key, current);
+  });
+  return [...map.values()].sort((a, b) => String(a.sort).localeCompare(String(b.sort)));
+}
+
+function pctDelta(series, key) {
+  if (!series || series.length < 2) return null;
+  const last = num(series[series.length - 1][key]);
+  const prev = num(series[series.length - 2][key]);
+  if (!prev) return null;
+  return ((last - prev) / Math.abs(prev)) * 100;
+}
+
+/**
+ * Primary "analytics" panel for a dashboard: a headline total + period-over-period
+ * delta over a daily series that re-buckets with the timeframe. The economic/stat
+ * centerpiece of the redesigned dashboards.
+ */
+export function TrendPanel({ title, subtitle, rows, loading, dateKey, valueKey, range, color = '#10b981', format = formatNumber, height = 300, kind = 'area' }) {
+  const series = useMemo(() => bucketSeries(rows, dateKey, valueKey, range), [rows, dateKey, valueKey, range]);
+  const total = series.reduce((acc, item) => acc + num(item[valueKey]), 0);
+  const delta = pctDelta(series, valueKey);
+  return (
+    <Card className="trend-panel">
+      <div className="trend-panel-head">
+        <div>
+          <h3>{title}</h3>
+          {subtitle && <span className="trend-panel-sub">{subtitle}</span>}
+        </div>
+        <div className="trend-panel-figure">
+          <strong>{format(total)}</strong>
+          {delta != null && (
+            <span className={`trend-delta ${delta >= 0 ? 'up' : 'down'}`}>
+              {delta >= 0 ? '▲' : '▼'} {formatNumber(Math.abs(delta).toFixed(1))}%
+            </span>
+          )}
+        </div>
+      </div>
+      {loading ? <Loader /> : series.length === 0
+        ? <EmptyState icon={<TrendingUpIcon size={26} />} title="Chưa có dữ liệu" message="Chọn khoảng thời gian khác để xem xu hướng." />
+        : kind === 'bar'
+          ? <Bars data={series} xKey="label" yKeys={[valueKey]} height={height} />
+          : <AreaTrend data={series} xKey="label" yKey={valueKey} height={height} color={color} />}
+    </Card>
   );
 }
 

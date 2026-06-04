@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
+import { CircleMarker, MapContainer, Popup, TileLayer, Tooltip } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useActionData } from '../../lib/useAction';
 import { formatVND, formatNumber, formatDate } from '../../lib/format';
-import { DashboardStats, ActionModal, ConfirmAction, ReportView, QuickReports } from '../common';
+import { DashboardStats, DashboardHeader, TrendPanel, ActionModal, ConfirmAction, ReportView, QuickReports } from '../common';
 import { Bars, AreaTrend, Donut } from '../../components/charts';
 import {
   Card, CardHeader, PageHeader, Button, Badge, EmptyState, Loader, Tabs
@@ -20,35 +22,131 @@ function aggregateSum(rows, nameKey, valKey) {
   return [...map.entries()].map(([name, value]) => ({ name, value }));
 }
 
+function isValidCoordinate(lat, lng) {
+  return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+function stationMarkerRadius(revenue, maxRevenue) {
+  if (!maxRevenue) return 4;
+  return Math.max(3, Math.min(11, 3 + Math.sqrt(Math.max(revenue, 0) / maxRevenue) * 8));
+}
+
+function StationRevenueMap({ rows, loading, error }) {
+  const stations = useMemo(() => rows
+    .map((row) => ({
+      ...row,
+      Latitude: Number(row.Latitude),
+      Longitude: Number(row.Longitude),
+      CompletedSessions: Number(row.CompletedSessions) || 0,
+      TotalKWh: Number(row.TotalKWh) || 0,
+      RevenueTotal: Number(row.RevenueTotal) || 0
+    }))
+    .filter((row) => isValidCoordinate(row.Latitude, row.Longitude)), [rows]);
+  const maxRevenue = Math.max(0, ...stations.map((s) => s.RevenueTotal));
+  const activeStations = stations.filter((s) => s.StationStatus === 'Active').length;
+
+  return (
+    <Card className="station-map-card">
+      <CardHeader
+        title="Bản đồ doanh thu trạm sạc"
+        subtitle="Chấm tròn theo tọa độ trạm, kích thước phản ánh doanh thu"
+        action={!loading && <span className="station-map-count">{formatNumber(stations.length)} trạm · {formatNumber(activeStations)} active</span>}
+      />
+      {loading ? <Loader /> : error ? (
+        <EmptyState title="Không tải được dữ liệu bản đồ" message={error} />
+      ) : stations.length === 0 ? (
+        <EmptyState title="Chưa có tọa độ trạm" message="Không tìm thấy trạm có kinh độ, vĩ độ hợp lệ trong dữ liệu hiện tại." />
+      ) : (
+        <div className="station-map-wrap">
+          <MapContainer className="station-map" center={[16.2, 107.8]} zoom={5} minZoom={5} maxZoom={15} scrollWheelZoom>
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              crossOrigin="anonymous"
+            />
+            {stations.map((station) => {
+              const radius = stationMarkerRadius(station.RevenueTotal, maxRevenue);
+              const isEarning = station.RevenueTotal > 0;
+              return (
+                <CircleMarker
+                  key={station.StationID}
+                  center={[station.Latitude, station.Longitude]}
+                  radius={radius}
+                  pathOptions={{
+                    color: '#ffffff',
+                    fillColor: isEarning ? '#10b981' : '#94a3b8',
+                    fillOpacity: isEarning ? 0.85 : 0.55,
+                    opacity: 1,
+                    weight: 1
+                  }}
+                >
+                  <Tooltip direction="top" offset={[0, -4]} opacity={1} className="station-map-tooltip">
+                    <strong>{station.StationName}</strong>
+                    <span>{station.StationCode} · {formatVND(station.RevenueTotal)}</span>
+                  </Tooltip>
+                  <Popup className="station-map-popup">
+                    <div>
+                      <strong>{station.StationName}</strong>
+                      <span>{station.StationCode} · {station.RegionName || 'Chưa có khu vực'}</span>
+                    </div>
+                    <dl>
+                      <dt>Doanh thu</dt><dd>{formatVND(station.RevenueTotal)}</dd>
+                      <dt>Phiên hoàn tất</dt><dd>{formatNumber(station.CompletedSessions)}</dd>
+                      <dt>Sản lượng</dt><dd>{formatNumber(station.TotalKWh)} kWh</dd>
+                      <dt>Trạng thái</dt><dd>{station.StationStatus}</dd>
+                    </dl>
+                  </Popup>
+                </CircleMarker>
+              );
+            })}
+          </MapContainer>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 /* ------------------------------- Dashboard ------------------------------- */
 export function BizDashboard({ ctx, h }) {
-  const [dashboardRange, setDashboardRange] = useState({});
-  const dashboardBody = useMemo(() => ({ ...dashboardRange }), [dashboardRange]);
-  const region = useActionData('regionRevenue', { token: ctx.token, body: { ...dashboardBody, pageSize: 20 } });
-  const growth = useActionData('customerGrowth', { token: ctx.token, body: { ...dashboardBody, pageSize: 24 } });
-  const sessions = useActionData('sessionStatistics', { token: ctx.token, body: { ...dashboardBody, pageSize: 100 } });
+  const [range, setRange] = useState({});
+  const body = useMemo(() => ({ ...range }), [range]);
+  const revenue = useActionData('stationRevenueTrend', { token: ctx.token, body: { ...body, pageSize: 5000 }, auto: h.has('stationRevenueTrend') });
+  const map = useActionData('stationRevenueMap', { token: ctx.token, body: { ...body, pageSize: 5000 }, auto: h.has('stationRevenueMap') });
+  const region = useActionData('regionRevenue', { token: ctx.token, body: { ...body, pageSize: 20 } });
+  const sessions = useActionData('sessionStatistics', { token: ctx.token, body: { ...body, pageSize: 5000 } });
 
-  const growthData = growth.rows.map((r) => ({ label: `${r.CreatedMonth}/${r.CreatedYear}`, NewCustomers: Number(r.NewCustomers) || 0 })).reverse();
   const sessionData = aggregateSum(sessions.rows, 'SessionStatus', 'SessionCount');
 
   return (
     <div className="ui-stack">
-      <PageHeader icon={<BusinessIcon size={22} />} title="Tổng quan kinh doanh" subtitle="Doanh thu, tăng trưởng khách hàng và hiệu suất phiên sạc." />
-      <DashboardStats actionId="businessDashboard" token={ctx.token} accents={['brand', 'info', 'warn', 'brand']} onRangeChange={setDashboardRange} />
+      <DashboardHeader icon={<BusinessIcon size={22} />} title="Tổng quan kinh doanh" subtitle="Doanh thu, tăng trưởng khách hàng và hiệu suất phiên sạc." range={range} onRangeChange={setRange} onToast={ctx.onToast} />
+      <DashboardStats actionId="businessDashboard" token={ctx.token} accents={['brand', 'info', 'warn', 'brand']} range={range} />
+      <div className={`ui-grid${h.has('stationRevenueMap') ? ' dash-split' : ''}`}>
+        {h.has('stationRevenueTrend') && (
+          <TrendPanel
+            title="Doanh thu hệ thống"
+            subtitle="Tổng doanh thu theo khoảng thời gian đã chọn (VND)"
+            rows={revenue.rows}
+            loading={revenue.loading}
+            dateKey="RevenueDate"
+            valueKey="RevenueTotal"
+            range={range}
+            format={formatVND}
+            height={400}
+          />
+        )}
+        {h.has('stationRevenueMap') && <StationRevenueMap rows={map.rows} loading={map.loading} error={map.error} />}
+      </div>
       <div className="ui-grid ui-grid-2">
         <Card>
-          <CardHeader title="Doanh thu theo khu vực" subtitle="VND" />
-          {region.loading ? <Loader /> : <Bars data={region.rows} xKey="RegionName" yKeys={['RevenueTotal']} height={280} />}
+          <CardHeader title="Doanh thu theo khu vực" subtitle="Top khu vực theo doanh thu (VND)" />
+          {region.loading ? <Loader /> : <Bars data={region.rows.slice(0, 8)} xKey="RegionName" yKeys={['RevenueTotal']} height={300} horizontal />}
         </Card>
         <Card>
-          <CardHeader title="Tăng trưởng khách hàng" subtitle="Khách hàng mới theo tháng" />
-          {growth.loading ? <Loader /> : <AreaTrend data={growthData} xKey="label" yKey="NewCustomers" height={280} />}
+          <CardHeader title="Phân bố phiên sạc theo trạng thái" subtitle="Trong khoảng thời gian đã chọn" />
+          {sessions.loading ? <Loader /> : <Donut data={sessionData} nameKey="name" valueKey="value" height={280} />}
         </Card>
       </div>
-      <Card>
-        <CardHeader title="Phân bố phiên sạc theo trạng thái" />
-        {sessions.loading ? <Loader /> : <Donut data={sessionData} nameKey="name" valueKey="value" height={300} />}
-      </Card>
       <QuickReports h={h} token={ctx.token} onToast={ctx.onToast} reports={BIZ_QUICK_REPORTS} />
     </div>
   );

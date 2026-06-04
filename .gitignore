@@ -13,7 +13,7 @@ build/
 
 # Editor settings
 .vscode/
-
+.claude/
 # Logs
 *.log
 npm-debug.log*

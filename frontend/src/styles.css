@@ -1372,6 +1372,61 @@ tbody tr:last-child td { border-bottom: none; }
 .date-range-controls-compact input { min-height: 34px; max-width: 138px; }
 .quick-report-range { margin-bottom: 12px; }
 
+/* ============================================================
+   DASHBOARD CONSOLE — economic / statistical styling
+   ============================================================ */
+/* Timeframe picker rendered as a single neat pill, like a stat console control.
+   inline-flex + nowrap so it hugs its content (never stretches full width) and
+   keeps the icon + dropdown on one centered line. */
+.dash-header-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.date-range-controls {
+  display: inline-flex; flex-wrap: nowrap; align-items: center;
+  width: fit-content; max-width: 100%;
+  background: #fff; border: 1px solid var(--border); border-radius: 999px;
+  padding: 0 10px 0 12px; gap: 6px; min-height: 38px; box-shadow: var(--shadow-sm);
+}
+.date-range-controls-compact { min-height: 36px; }
+.date-range-icon { display: inline-flex; align-items: center; flex-shrink: 0; color: var(--text-muted); }
+.date-range-controls select {
+  width: auto; height: 30px; min-height: 0; max-width: none;
+  border: none; background: transparent; box-shadow: none; font-weight: 600;
+  font-size: 13px; color: var(--text-dark); padding: 0 2px; cursor: pointer; line-height: 1.2;
+}
+.date-range-controls-compact select { height: 30px; min-height: 0; max-width: none; }
+.date-range-controls select:focus { outline: none; box-shadow: none; }
+.date-range-controls input {
+  width: auto; height: 30px; min-height: 0; max-width: 150px;
+  border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; font-size: 12.5px;
+}
+
+/* A plain inline timeframe row for screens that use a hero instead of a header. */
+.dash-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.dash-toolbar-label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.dash-toolbar-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* Headline analytics panel: title + big total + period-over-period delta. */
+.trend-panel { padding: 22px 22px 8px; }
+.trend-panel-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap; margin-bottom: 8px;
+}
+.trend-panel-head h3 { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--text-dark); }
+.trend-panel-sub { display: block; font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.trend-panel-figure { display: flex; align-items: baseline; gap: 10px; }
+.trend-panel-figure strong {
+  font-family: var(--font-display); font-size: 28px; font-weight: 700; color: var(--text-dark);
+  letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums;
+}
+.trend-delta {
+  display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 700;
+  padding: 3px 9px; border-radius: 999px; font-variant-numeric: tabular-nums;
+}
+.trend-delta.up { color: var(--ok); background: var(--ok-bg); }
+.trend-delta.down { color: var(--danger); background: var(--danger-bg); }
+
+/* Tabular figures everywhere on the dashboards reads more "statistical". */
+.ui-stat-value { font-variant-numeric: tabular-nums; }
+
 /* Section stack */
 .ui-stack { display: flex; flex-direction: column; gap: 22px; animation: fadeSlideUp 0.3s var(--ease-out); }
 
@@ -1494,11 +1549,109 @@ tbody tr:last-child td { border-bottom: none; }
 .receipt-rows span { color: var(--text-muted); }
 .receipt-rows b { color: var(--text-dark); font-weight: 600; text-align: right; min-width: 0; overflow-wrap: anywhere; }
 
+/* Business station revenue map */
+/* System-revenue trend + station map share one row; the map takes the narrower
+   column so it reads tall/portrait (matches Vietnam's shape) and stretches to the
+   trend panel's height. */
+.dash-split { grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr); align-items: stretch; }
+@media (max-width: 900px) { .dash-split { grid-template-columns: 1fr; } }
+
+.station-map-card { padding-bottom: 18px; display: flex; flex-direction: column; }
+.dash-split .station-map-card { padding-bottom: 18px; }
+.dash-split .station-map-wrap { flex: 1 1 auto; height: auto; min-height: 420px; }
+.station-map-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-main);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.station-map-wrap {
+  height: clamp(360px, 48vh, 560px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-main);
+}
+.station-map {
+  width: 100%;
+  height: 100%;
+  font-family: var(--font);
+}
+.station-map .leaflet-control-attribution {
+  font-size: 10px;
+}
+.station-map-tooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-main);
+  font-family: var(--font);
+}
+.station-map-tooltip strong {
+  color: var(--text-dark);
+  font-size: 12px;
+  max-width: 220px;
+  overflow-wrap: anywhere;
+}
+.station-map-tooltip span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.station-map-popup .leaflet-popup-content {
+  min-width: 220px;
+  margin: 14px;
+  font-family: var(--font);
+}
+.station-map-popup strong {
+  display: block;
+  color: var(--text-dark);
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.station-map-popup span {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.station-map-popup dl {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) auto;
+  gap: 7px 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-strong);
+}
+.station-map-popup dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.station-map-popup dd {
+  color: var(--text-dark);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
 @media (max-width: 600px) {
   .hero { flex-direction: column; align-items: flex-start; }
   .session-card { flex-direction: column; text-align: center; }
   .session-figures { justify-content: center; }
   .session-head { justify-content: center; }
+  .station-map-wrap { height: 380px; }
+  .station-map-count { display: none; }
 }
 
 /* Metric row (station cards) */

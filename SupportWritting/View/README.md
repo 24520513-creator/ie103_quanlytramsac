@@ -1,0 +1,62 @@
+# SupportWritting / View
+
+Soan lai source code View theo dung thu tu bao cao.
+Moi muc: tieu de View -> source dinh nghia View -> cau lenh test (SELECT).
+
+- **4.5.4 Nhom View phuc vu khach hang** -> `01_KhachHang.sql` (6 view)
+  - AppView.vw_CustomerChargingHistory
+  - AppView.vw_CustomerBookingHistory
+  - AppView.vw_InvoiceDetail
+  - AppView.vw_MyVehicles
+  - AppView.vw_MyChargingSummary
+  - AppView.vw_AvailableChargingPoints
+- **4.5.5 Nhom View phuc vu quan ly kinh doanh** -> `02_QuanLyKinhDoanh.sql` (15 view)
+  - AppView.vw_StationRevenueDaily
+  - AppView.vw_StationRevenueByYear
+  - AppView.vw_FranchiseRevenueMonthly
+  - AppView.vw_RegionRevenue
+  - AppView.vw_TopRevenueStations
+  - AppView.vw_TopCustomerUsage
+  - AppView.vw_PeakHourStatistics
+  - AppView.vw_ChargingSessionStatistics
+  - AppView.vw_CustomerGrowth
+  - AppView.vw_PaymentSummary
+  - AppView.vw_RefundablePayments
+  - AppView.vw_PricingPolicies
+  - AppView.vw_ProfitSharing
+  - AppView.vw_ConnectorUtilization
+  - AppView.vw_SystemOperationalKPI
+- **4.5.6 Nhom View phuc vu van hanh he thong** -> `03_VanHanh.sql` (5 view)
+  - AppView.vw_StationStatusOverview
+  - AppView.vw_ActiveChargingSessions
+  - AppView.vw_MaintenanceKPI
+  - AppView.vw_MaintenanceTickets
+  - AppView.vw_ErrorLogActive
+- **4.5.7 Nhom View phuc vu quan tri he thong** -> `04_QuanTri.sql` (3 view)
+  - AppView.vw_UserRoleSummary
+  - AppView.vw_AccountsByRole
+  - AppView.vw_AuditLogRecent
+- **4.5.8 Nhom View phuc vu franchise partner** -> `05_FranchisePartner.sql` (5 view)
+  - AppView.vw_MyFranchiseProfile
+  - AppView.vw_MyFranchiseContracts
+  - AppView.vw_MyFranchiseStations
+  - AppView.vw_MyRevenueSharePolicies
+  - AppView.vw_MyRevenueShareSettlements
+- **4.5.9 Nhom View ho tro Web UI** -> `06_WebUI.sql` (17 view)
+  - AppView.vw_WebLookupConnectorTypes
+  - AppView.vw_WebLookupCustomerVehicles
+  - AppView.vw_WebLookupAvailablePoints
+  - AppView.vw_WebLookupCustomerBookings
+  - AppView.vw_WebLookupCustomerSessions
+  - AppView.vw_WebLookupStations
+  - AppView.vw_WebLookupPoints
+  - AppView.vw_WebLookupActiveSessions
+  - AppView.vw_WebLookupOpenTickets
+  - AppView.vw_WebLookupOperationsStaff
+  - AppView.vw_WebLookupPricingPolicies
+  - AppView.vw_WebLookupRevenueSharePolicies
+  - AppView.vw_WebLookupFranchises
+  - AppView.vw_WebLookupRefundablePayments
+  - AppView.vw_WebLookupUsers
+  - AppView.vw_WebLookupAssignableRoles
+  - AppView.vw_WebLookupRemovableRoles

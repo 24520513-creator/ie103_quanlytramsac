@@ -1,0 +1,57 @@
+# SupportWritting / StorageProcedure
+
+Thu muc soan lai source code stored procedure theo dung thu tu bao cao.
+Moi muc gom: tieu de SP -> source dinh nghia SP -> source test (co chu thich).
+
+- **4.2.4 Nhom Stored Procedure quan ly dinh danh & phan quyen** -> `01_Identity_QuanLyDinhDanh.sql` (10 SP)
+  - Identity.sp_CreateUser
+  - Identity.sp_RegisterCustomer
+  - Identity.sp_RequestPasswordReset
+  - Identity.sp_ResetPasswordByToken
+  - Identity.sp_VerifyEmailToken
+  - Identity.sp_LockUser
+  - Identity.sp_UnlockUser
+  - Identity.sp_ResetPassword
+  - Identity.sp_AssignRole
+  - Identity.sp_RemoveRole
+- **4.2.5 Nhom Stored Procedure quan ly ha tang tram sac** -> `02_Infrastructure_HaTangTramSac.sql` (4 SP)
+  - Infrastructure.sp_CreateChargingStation
+  - Infrastructure.sp_CreateChargingPoint
+  - Infrastructure.sp_UpdateStationStatus
+  - Infrastructure.sp_UpdateChargingPointStatus
+- **4.2.6 Nhom Stored Procedure quan ly van hanh he thong** -> `03_Operations_VanHanh.sql` (9 SP)
+  - Operations.sp_CreateVehicle
+  - Operations.sp_UpdateVehicle
+  - Operations.sp_CreateBooking
+  - Operations.sp_CancelBooking
+  - Operations.sp_StartChargingSession
+  - Operations.sp_EndChargingSession
+  - Operations.sp_MarkChargingSessionFailed
+  - Operations.sp_CreatePricingPolicy
+  - Operations.sp_DeactivatePricingPolicy
+- **4.2.7 Nhom Stored Procedure thanh toan va hoa don** -> `04_Payments_ThanhToanHoaDon.sql` (3 SP)
+  - Payments.sp_CreatePayment
+  - Payments.sp_RefundPayment
+  - Payments.sp_CreateInvoice
+- **4.2.8 Nhom Stored Procedure bao tri he thong** -> `05_Maintenance_BaoTri.sql` (4 SP)
+  - Maintenance.sp_ReportError
+  - Maintenance.sp_AssignTicket
+  - Maintenance.sp_ScheduleMaintenance
+  - Maintenance.sp_CloseTicket
+- **4.2.9 Nhom Stored Procedure franchise va chia doanh thu** -> `06_Franchise_ChiaDoanhThu.sql` (2 SP)
+  - Franchise.sp_UpdateRevenueSharePolicy
+  - Franchise.sp_CreateRevenueSettlement
+- **4.2.10 Nhom Reporting Procedure** -> `07_Reporting_BaoCao.sql` (13 SP)
+  - AppView.sp_GetStationRevenue
+  - AppView.sp_GetFranchiseProfitSharing
+  - AppView.sp_GetPaymentSummary
+  - AppView.sp_GetCustomerUsage
+  - AppView.sp_GetOperationalKPI
+  - AppView.sp_GetTelemetryHealth
+  - AppView.sp_GetCurrentUserProfile
+  - AppView.sp_GetMyFranchiseProfile
+  - AppView.sp_GetMyFranchiseContracts
+  - AppView.sp_GetMyFranchiseStations
+  - AppView.sp_GetMyRevenueSharePolicies
+  - AppView.sp_GetMyRevenueShareSettlements
+  - AppView.sp_ActivatePricingPolicy

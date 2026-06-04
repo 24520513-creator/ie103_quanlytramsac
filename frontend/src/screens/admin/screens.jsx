@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useActionData } from '../../lib/useAction';
 import { formatValue, formatDate, isStatusColumn } from '../../lib/format';
-import { DashboardStats, ActionModal, ConfirmAction, ReportView, QuickReports } from '../common';
+import { DashboardStats, DashboardHeader, TrendPanel, ActionModal, ConfirmAction, ReportView, QuickReports } from '../common';
 import { Donut } from '../../components/charts';
 import {
   Card, CardHeader, PageHeader, Button, Badge, EmptyState, Loader, SearchInput, DataTable, Tabs
@@ -21,12 +21,29 @@ function sumByKey(rows, nameKey, valKey) {
 }
 
 export function AdminDashboard({ ctx, h }) {
-  const roles = useActionData('accountsByRole', { token: ctx.token, body: { pageSize: 50 } });
+  const [range, setRange] = useState({});
+  const body = useMemo(() => ({ ...range }), [range]);
+  const trend = useActionData('accountActivityTrend', { token: ctx.token, body: { ...body, pageSize: 5000 }, auto: h.has('accountActivityTrend') });
+  const roles = useActionData('accountsByRole', { token: ctx.token, body: { ...body, pageSize: 50 } });
   const roleData = sumByKey(roles.rows, 'RoleCode', 'AccountCount');
   return (
     <div className="ui-stack">
-      <PageHeader icon={<AdminIcon size={22} />} title="Tổng quan quản trị" subtitle="Tài khoản, vai trò và hoạt động hệ thống gần nhất." />
-      <DashboardStats actionId="adminDashboard" token={ctx.token} accents={['brand', 'bad', 'info', 'warn']} />
+      <DashboardHeader icon={<AdminIcon size={22} />} title="Tổng quan quản trị" subtitle="Tài khoản, vai trò và hoạt động hệ thống gần nhất." range={range} onRangeChange={setRange} onToast={ctx.onToast} />
+      <DashboardStats actionId="adminDashboard" token={ctx.token} accents={['brand', 'bad', 'info', 'warn']} range={range} />
+      {h.has('accountActivityTrend') && (
+        <TrendPanel
+          title="Tài khoản mới"
+          subtitle="Số tài khoản tạo mới theo khoảng thời gian đã chọn"
+          rows={trend.rows}
+          loading={trend.loading}
+          dateKey="ActivityDate"
+          valueKey="NewAccounts"
+          range={range}
+          color="#6366f1"
+          kind="bar"
+          height={300}
+        />
+      )}
       {h.has('accountsByRole') && (
         <Card>
           <CardHeader title="Tài khoản theo vai trò" subtitle="Số lượng tài khoản" />

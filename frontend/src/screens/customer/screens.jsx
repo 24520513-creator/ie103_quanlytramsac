@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useActionData, useLookupOptions } from '../../lib/useAction';
 import { formatVND, formatNumber, formatDate } from '../../lib/format';
-import { DashboardStats, ActionModal, ConfirmAction, QuickReports } from '../common';
-import { AreaTrend } from '../../components/charts';
+import { DashboardStats, DateRangeControls, ScreenshotButton, TrendPanel, ActionModal, ConfirmAction, QuickReports } from '../common';
 import {
   Card, CardHeader, PageHeader, Button, Badge, EmptyState, Loader, SearchInput, ProgressRing
 } from '../../components/ui';
@@ -15,28 +14,39 @@ import {
 /* ----------------------------------- Home ----------------------------------- */
 export function CustomerHome({ ctx, h }) {
   const name = ctx.user.profile?.FullName || ctx.user.username;
-  const summary = useActionData('myChargingSummary', { token: ctx.token, body: { pageSize: 24 } });
-  const spendData = summary.rows
-    .map((r) => ({ label: `${r.UsageMonth}/${r.UsageYear}`, TotalSpend: Number(r.TotalSpend) || 0 }))
-    .reverse();
+  const [range, setRange] = useState({});
+  const body = useMemo(() => ({ ...range }), [range]);
+  const spend = useActionData('customerSpendTrend', { token: ctx.token, body: { ...body, pageSize: 5000 }, auto: h.has('customerSpendTrend') });
   return (
     <div className="ui-stack">
       <Card className="hero">
         <div className="hero-text">
           <span className="hero-eyebrow">Xin chào</span>
-          <h1>{name} 👋</h1>
+          <h1>{name}</h1>
           <p>Tìm trạm sạc gần bạn, đặt chỗ trước và theo dõi phiên sạc — tất cả trong một nơi.</p>
         </div>
         <div className="hero-mark"><BoltIcon size={42} /></div>
       </Card>
-      <DashboardStats actionId="customerDashboard" token={ctx.token} />
-      {h.has('myChargingSummary') && (
-        <Card>
-          <CardHeader title="Chi tiêu sạc theo tháng" subtitle="VND" />
-          {summary.loading ? <Loader /> : spendData.length === 0
-            ? <EmptyState icon={<BoltIcon size={26} />} title="Chưa có dữ liệu sạc" message="Hoàn tất một phiên sạc để xem thống kê." />
-            : <AreaTrend data={spendData} xKey="label" yKey="TotalSpend" height={260} />}
-        </Card>
+      <div className="dash-toolbar">
+        <span className="dash-toolbar-label">Khoảng thời gian</span>
+        <div className="dash-toolbar-controls">
+          <DateRangeControls value={range} onChange={setRange} compact />
+          <ScreenshotButton onToast={ctx.onToast} />
+        </div>
+      </div>
+      <DashboardStats actionId="customerDashboard" token={ctx.token} range={range} />
+      {h.has('customerSpendTrend') && (
+        <TrendPanel
+          title="Chi tiêu sạc"
+          subtitle="Tổng chi tiêu theo khoảng thời gian đã chọn (VND)"
+          rows={spend.rows}
+          loading={spend.loading}
+          dateKey="SpendDate"
+          valueKey="TotalSpend"
+          range={range}
+          format={formatVND}
+          height={280}
+        />
       )}
       <QuickReports h={h} token={ctx.token} onToast={ctx.onToast} reports={[
         { id: 'chargingHistory', label: 'Lịch sử phiên sạc', icon: <ChargingIcon size={16} /> },
